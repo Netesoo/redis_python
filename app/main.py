@@ -1,11 +1,36 @@
 import socket  # noqa: F401
 import threading
-from database import Database
+import json
+import os
 from enum import Enum
 from dataclasses import dataclass
 
 
 buff_size: int = 1024
+
+
+class Database:
+    def __init__(self, filename="data.json"):
+        self.filename = filename
+        self.store = self._load()
+
+    def _load(self):
+        if os.path.exists(self.filename):
+            with open(self.filename, "r") as f:
+                return json.load(f)
+        return {}
+
+    def _save(self):
+        with open(self.filename, "w") as f:
+            json.dump(self.store, f)
+
+    def set(self, key, value):
+        self.store[key] = value
+        self._save()
+
+    def get(self, key):
+        return self.store.get(key)
+
 
 
 class RESPType(bytes, Enum):
@@ -106,7 +131,7 @@ def cmd_echo(args, database):
 
 def cmd_ping(args, database):
     msg = "PONG"
-    return f"${len(msg)}\r\n{msg}\r\n".encode()
+    return f"+PONG\r\n".encode()
 
 
 def cmd_set(args, database):
