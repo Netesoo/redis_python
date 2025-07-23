@@ -1,5 +1,6 @@
 import socket  # noqa: F401
 import threading
+from database import Database
 from enum import Enum
 from dataclasses import dataclass
 
@@ -75,7 +76,7 @@ def read_line(data: bytes, start: int) -> tuple[bytes, int]:
     return data[start:end], end + 2
 
 
-def handle_parsed_value(resp_value: RESPValue):
+def handle_parsed_value(resp_value: RESPValue, database: Database):
     if resp_value.type != RESPType.ARRAY:
         return b"-ERR expected array\r\n"
 
@@ -85,21 +86,56 @@ def handle_parsed_value(resp_value: RESPValue):
 
     command = items[0].value.upper()
     args = [item.value for item in items[1:]]
+    print(f"{args}")
+    return handle_command(command, args, database)
 
-    if command == "ECHO":
-        if len(args) != 1:
+
+def handle_command(command, args, database):
+    func = COMMANDS.get(command.upper())
+    if not func:
+        return b"-ERR unknown command\r\n"
+    return func(args, database)
+
+
+def cmd_echo(args, database):
+    if len(args) != 1:
             return b"-ERR wrong number of arguments\r\n"
-        msg = args[0]
-        return f"${len(msg)}\r\n{msg}\r\n".encode()
-
-    elif command == "PING":
-        msg = "PONG"
-        return f"${len(msg)}\r\n{msg}\r\n".encode()
-
-    return b"-ERR unknown command\r\n"
+    msg = args[0]
+    return f"${len(msg)}\r\n{msg}\r\n".encode()
 
 
-def handle_client(client: socket.socket):
+def cmd_ping(args, database):
+    msg = "PONG"
+    return f"${len(msg)}\r\n{msg}\r\n".encode()
+
+
+def cmd_set(args, database):
+    if len(args) != 2:
+        return b"-ERR wrong number of arguments\r\n"
+    database.set(args[0], args[1])
+    return f"+OK\r\n".encode()
+
+
+def cmd_get(args, database):
+    if len(args) != 1:
+        return b"-ERR wrong number of arguments\r\n"
+    
+    value = database.get(args[0])
+    if value is None:
+        return b"$-1\r\n"
+    
+    return f"${len(value)}\r\n{value}\r\n".encode()
+
+
+COMMANDS = {
+    "PING": cmd_ping,
+    "ECHO": cmd_echo,
+    "SET": cmd_set,
+    "GET": cmd_get,
+}
+
+
+def handle_client(client: socket.socket, database: Database):
     buffer = b""
     while data := client.recv(buff_size):
         buffer += data
@@ -108,23 +144,25 @@ def handle_client(client: socket.socket):
         while offset < len(buffer):
             try:
                 value, offset = parse_resp_with_offset(buffer, offset)
-                print(f"Got: {value.value}")
+#                print(f"Got: {value.value}")
 
-                client.sendall(handle_parsed_value(value))
+                client.sendall(handle_parsed_value(value, database))
             except IncompleteRESPError:
                 break
         
         buffer = buffer[offset:]
 
-def _gether():
+
+def _gether(database: Database):
     server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     while True:
         client_socket, client_addr = server_socket.accept()
-        threading.Thread(target=handle_client, args=(client_socket,)).start()
+        threading.Thread(target=handle_client, args=(client_socket, database)).start()
 
 
 def main():
-    _gether()
+    database = Database()
+    _gether(database)
 
 
 if __name__ == "__main__":
