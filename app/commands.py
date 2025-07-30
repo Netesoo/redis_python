@@ -56,17 +56,15 @@ def cmd_rpush(args, database):
     values = args[1:]
 
     current = database.get(key)
-    print(type(current))
+    
     if current is None:
         current = []
-    elif not is_instace(current, list):
+    elif not isinstance(current, list):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
     current.extend(values)
-    print(type(current))
-    
     database.set(key, current)
-    print(database.get(key))
+    
     return f":{len(current)}\r\n".encode()
 
 
