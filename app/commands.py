@@ -63,8 +63,10 @@ def cmd_rpush(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
     current.extend(values)
+    print(type(current))
+    
     database.set(key, current)
-
+    print(database.get(key))
     return f":{len(current)}\r\n".encode()
 
 

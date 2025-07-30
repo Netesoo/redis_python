@@ -1,3 +1,4 @@
+from typing import Any
 import json
 import time
 import threading
@@ -18,13 +19,13 @@ class Database:
     def _load(self):
         if os.path.exists(self.path):
             with open(self.path, "r") as f:
-                return json.load(f)
+                self._store = json.load(f)
 
     def _save(self):
         with open(self.path, "w") as f:
             json.dump(self._store, f)
 
-    def set(self, key: str, value: str, px: int = None):
+    def set(self, key: str, value: Any, px: int = None):
         with self._lock:
             entry = {"value": value}
             if px:
@@ -32,12 +33,12 @@ class Database:
             self._store[key] = entry
             self._save()
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> Any | None:
         with self._lock:
             entry = self._store.get(key)
             if not entry:
                 return None
-            
+
             expires_at = entry.get("expires_at")
             if expires_at and current_millis() > expires_at:
                 del self._store[key]
