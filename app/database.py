@@ -16,14 +16,17 @@ class Database:
         self.path = path
         self._load()
 
+
     def _load(self):
         if os.path.exists(self.path):
             with open(self.path, "r") as f:
                 self._store = json.load(f)
 
+
     def _save(self):
         with open(self.path, "w") as f:
             json.dump(self._store, f)
+
 
     def set(self, key: str, value: Any, px: int = None):
         with self._lock:
@@ -32,6 +35,7 @@ class Database:
                 entry["expires_at"] = current_millis() + px
             self._store[key] = entry
             self._save()
+
 
     def get(self, key: str) -> Any | None:
         with self._lock:
@@ -47,8 +51,64 @@ class Database:
 
             return entry["value"]
 
+
     def delete(self, key: str):
         with self._lock:
             if key in self._store:
                 del self._store[key]
                 self._save()
+
+
+    def rpush(self, key: str, *values: str) -> int:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry:
+                if not isinstance(entry["value"], list):
+                    raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+                entry["value"].extend(values)
+            else:
+                self._store[key] = {"value": list(values)}
+            self._save()
+            
+            return len(self._store[key]["value"])
+
+
+    def lrange(self, key: str, start: int, stop: int) -> list:
+        with self._lock:
+            entry = self._store.get(key)
+
+            if not entry:
+                return []
+            
+            if not isinstance(entry["value"], list):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            lst = entry["value"]
+            lenght = len(lst)
+
+            if lenght == 0:
+                return []
+
+            if start >= lenght:
+                return []
+
+            if stop >= lenght:
+                stop = lenght - 1
+            
+            
+
+
+#           if start < 0:
+#               start = lenght + start
+#           if stop < 0:
+#               stop = lenght + stop
+#
+#           if start < 0:
+#               start = 0
+#           if stop >= 0:
+#               stop = lenght - 1
+
+            if start > stop:
+                return []
+            
+            return lst[start:stop + 1]

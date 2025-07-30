@@ -55,17 +55,33 @@ def cmd_rpush(args, database):
     key = args[0]
     values = args[1:]
 
-    current = database.get(key)
-    
-    if current is None:
-        current = []
-    elif not isinstance(current, list):
+    try:
+        new_len = database.rpush(key, *values)
+        return f":{new_len}\r\n".encode()
+    except TypeError:
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
-    current.extend(values)
-    database.set(key, current)
-    
-    return f":{len(current)}\r\n".encode()
+
+def cmd_lrange(args, database):
+    if len(args) != 3:
+        return b"-ERR wrong number of arguments\r\n"
+
+    key = args[0]
+    try:
+        start = int(args[1])
+        stop = int(args[2])
+    except ValueError:
+        return b"-ERR value is not an integer or out of range\r\n"
+
+    try:
+        result = database.lrange(key, start, stop)
+        response = f"*{len(result)}\r\n"
+        for item in result:
+            response += f"${len(item)}\r\n{item}\r\n"
+        return response.encode()
+    except TypeError:
+        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+
 
 
 COMMANDS = {
@@ -74,4 +90,5 @@ COMMANDS = {
     "SET": cmd_set,
     "GET": cmd_get,
     "RPUSH": cmd_rpush,
+    "LRANGE": cmd_lrange,
 }
