@@ -1,8 +1,6 @@
 from typing import Any
-import json
 import time
 import threading
-import os
 
 
 def current_millis():
@@ -10,23 +8,9 @@ def current_millis():
 
 
 class Database:
-    def __init__(self, path="db.json"):
+    def __init__(self):
         self._store = {}
         self._lock = threading.Lock()
-        self.path = path
-        self._load()
-
-
-    def _load(self):
-        if os.path.exists(self.path):
-            with open(self.path, "r") as f:
-                self._store = json.load(f)
-
-
-    def _save(self):
-        with open(self.path, "w") as f:
-            json.dump(self._store, f)
-
 
     def set(self, key: str, value: Any, px: int = None):
         with self._lock:
@@ -34,8 +18,6 @@ class Database:
             if px:
                 entry["expires_at"] = current_millis() + px
             self._store[key] = entry
-            self._save()
-
 
     def get(self, key: str) -> Any | None:
         with self._lock:
@@ -46,18 +28,14 @@ class Database:
             expires_at = entry.get("expires_at")
             if expires_at and current_millis() > expires_at:
                 del self._store[key]
-                self._save()
                 return None
 
             return entry["value"]
-
 
     def delete(self, key: str):
         with self._lock:
             if key in self._store:
                 del self._store[key]
-                self._save()
-
 
     def rpush(self, key: str, *values: str) -> int:
         with self._lock:
@@ -68,13 +46,9 @@ class Database:
                 entry["value"].extend(values)
             else:
                 self._store[key] = {"value": list(values)}
-            self._save()
-            
             return len(self._store[key]["value"])
 
-
     def lpush(self, key: str, *values: str) -> int:
-        print(values)
         with self._lock:
             entry = self._store.get(key)
             if entry:
@@ -84,10 +58,7 @@ class Database:
                     entry["value"].insert(0, value)
             else:
                 self._store[key] = {"value": list(reversed(values))}
-            self._save()
-            
             return len(self._store[key]["value"])
-
 
     def lrange(self, key: str, start: int, stop: int) -> list:
         with self._lock:
@@ -95,33 +66,42 @@ class Database:
 
             if not entry:
                 return []
-            
+
             if not isinstance(entry["value"], list):
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
-            
+
             lst = entry["value"]
-            lenght = len(lst)
+            length = len(lst)
 
-            if lenght == 0:
+            if length == 0:
                 return []
 
-            if start >= lenght:
+            if start >= length:
                 return []
 
-            if stop >= lenght:
-                stop = lenght - 1
+            if stop >= length:
+                stop = length - 1
 
             if start < 0:
-                start = lenght + start
+                start = length + start
             if stop < 0:
-                stop = lenght + stop
- 
+                stop = length + stop
+
             if start < 0:
                 start = 0
-            if stop >= lenght:
-                stop = lenght - 1
+            if stop >= length:
+                stop = length - 1
 
             if start > stop:
                 return []
-            
+
             return lst[start:stop + 1]
+
+
+    def llen(self, key: str) -> int:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry:
+                if not isinstance(entry["value"], list):
+                    return 0
+            return len(entry["value"])
