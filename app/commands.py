@@ -36,6 +36,7 @@ def cmd_set(args, database):
     database.set(key, value, px=px)
     return b"+OK\r\n"
 
+
 def cmd_get(args, database):
     if len(args) != 1:
         return b"-ERR wrong number of arguments\r\n"
@@ -47,9 +48,30 @@ def cmd_get(args, database):
     return f"${len(value)}\r\n{value}\r\n".encode()
 
 
+def cmd_rpush(args, database):
+    if len(args) < 2:
+        return b"-ERR wrong number of arguments\r\n"
+    
+    key = args[0]
+    values = args[1:]
+
+    current = database.get(key)
+
+    if current is None:
+        current = []
+    elif not is_instace(current, list):
+        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+
+    current.extend(values)
+    database.set(key, current)
+
+    return f":{len(current)}\r\n".encode()
+
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
     "SET": cmd_set,
     "GET": cmd_get,
+    "RPUSH": cmd_rpush,
 }

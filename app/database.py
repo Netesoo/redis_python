@@ -49,5 +49,5 @@ class Database:
     def delete(self, key: str):
         with self._lock:
             if key in self._store:
-                del self._sotre[key]
+                del self._store[key]
                 self._save()

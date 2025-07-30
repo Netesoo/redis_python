@@ -66,5 +66,5 @@ def parse_resp_with_offset(data: bytes, offset: int) -> tuple[RESPValue, int]:
 def read_line(data: bytes, start: int) -> tuple[bytes, int]:
     end = data.find(b"\r\n", start)
     if end == -1:
-        raise ValueError("Brakuje końca linii")
+        raise ValueError("Missing lines")
     return data[start:end], end + 2
