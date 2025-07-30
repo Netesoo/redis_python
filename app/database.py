@@ -103,5 +103,7 @@ class Database:
             entry = self._store.get(key)
             if entry:
                 if not isinstance(entry["value"], list):
+                    raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+                elif entry["value"] == None
                     return 0
             return len(entry["value"])
