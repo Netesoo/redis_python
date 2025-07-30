@@ -73,6 +73,22 @@ class Database:
             return len(self._store[key]["value"])
 
 
+    def lpush(self, key: str, *values: str) -> int:
+        print(values)
+        with self._lock:
+            entry = self._store.get(key)
+            if entry:
+                if not isinstance(entry["value"], list):
+                    raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+                for value in values:
+                    entry["value"].insert(0, value)
+            else:
+                self._store[key] = {"value": list(reversed(values))}
+            self._save()
+            
+            return len(self._store[key]["value"])
+
+
     def lrange(self, key: str, start: int, stop: int) -> list:
         with self._lock:
             entry = self._store.get(key)

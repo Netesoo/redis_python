@@ -62,6 +62,21 @@ def cmd_rpush(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
 
+def cmd_lpush(args, database):
+    if len(args) < 2:
+        return b"-ERR wrong number of arguments\r\n"
+
+    key = args[0]
+    values = args[1:]
+
+    try:
+        new_len = database.lpush(key, *values)
+        return f":{new_len}\r\n".encode()
+    except TypeError:
+        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+
+
+
 def cmd_lrange(args, database):
     if len(args) != 3:
         return b"-ERR wrong number of arguments\r\n"
@@ -94,5 +109,6 @@ COMMANDS = {
     "SET": cmd_set,
     "GET": cmd_get,
     "RPUSH": cmd_rpush,
+    "LPUSH": cmd_lpush,
     "LRANGE": cmd_lrange,
 }
