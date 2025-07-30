@@ -56,7 +56,7 @@ def cmd_rpush(args, database):
     values = args[1:]
 
     current = database.get(key)
-
+    print(type(current))
     if current is None:
         current = []
     elif not is_instace(current, list):
