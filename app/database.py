@@ -110,7 +110,7 @@ class Database:
             return len(entry["value"])
 
 
-    def lpop(self, key: str) -> list:
+    def lpop(self, key: str, val=1) -> list:
         with self._lock:
             entry = self._store.get(key)
             if entry:
@@ -118,4 +118,9 @@ class Database:
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
             elif entry == None:
                 return []
-            return [entry["value"].pop(0)]
+
+            lst = []
+            for i in range(val):
+                lst.append(entry["value"].pop(0))
+
+            return lst

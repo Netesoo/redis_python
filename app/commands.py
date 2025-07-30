@@ -118,18 +118,27 @@ def cmd_llen(args, database):
 def cmd_lpop(args, database):
     if len(args) < 1:
         return b"-ERR wrong number of arguments\r\n"
-
+    elif len(args) == 2:
+        try:
+            val = int(args[1])
+        except ValueError:
+            return b"-ERR value is not an integer\r\n"
+    else: val = 1
+    
     key = args[0]
-
     try:
-        result = database.lpop(key)
-        if result == []:
+        result = database.lpop(key, val)
+        if val > 1:
+            response = f"*{len(result)}\r\n"
+            for item in result:
+                response += f"${len(item)}\r\n{item}\r\n"
+            return response.encode()
+        elif result == []:
             return f"$-1\r\n".encode()
-        else:
-            return f"${len(result[0])}\r\n{result[0]}\r\n".encode()
+        else: return f"${len(result[0])}\r\n{result[0]}\r\n".encode()
+
     except TypeError:
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
-
 
 
 COMMANDS = {
