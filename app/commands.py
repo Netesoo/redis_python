@@ -115,6 +115,22 @@ def cmd_llen(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
 
+def cmd_lpop(args, database):
+    if len(args) < 1:
+        return b"-ERR wrong number of arguments\r\n"
+
+    key = args[0]
+
+    try:
+        result = database.lpop(key)
+        if result == []:
+            return f"$-1\r\n".encode()
+        else:
+            return f"${len(result[0])}\r\n{result[0]}\r\n".encode()
+    except TypeError:
+        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+
+
 
 COMMANDS = {
     "PING": cmd_ping,
@@ -125,4 +141,5 @@ COMMANDS = {
     "LPUSH": cmd_lpush,
     "LRANGE": cmd_lrange,
     "LLEN": cmd_llen,
+    "LPOP": cmd_lpop,
 }
