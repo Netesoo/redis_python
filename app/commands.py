@@ -78,6 +78,10 @@ def cmd_lrange(args, database):
         response = f"*{len(result)}\r\n"
         for item in result:
             response += f"${len(item)}\r\n{item}\r\n"
+
+        if result == []:
+            return f"*0\r\n".encode()
+
         return response.encode()
     except TypeError:
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"

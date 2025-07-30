@@ -94,19 +94,16 @@ class Database:
 
             if stop >= lenght:
                 stop = lenght - 1
-            
-            
 
-
-#           if start < 0:
-#               start = lenght + start
-#           if stop < 0:
-#               stop = lenght + stop
-#
-#           if start < 0:
-#               start = 0
-#           if stop >= 0:
-#               stop = lenght - 1
+            if start < 0:
+                start = lenght + start
+            if stop < 0:
+                stop = lenght + stop
+ 
+            if start < 0:
+                start = 0
+            if stop >= lenght:
+                stop = lenght - 1
 
             if start > stop:
                 return []
