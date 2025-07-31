@@ -44,9 +44,10 @@ class Database:
                 if not isinstance(entry["value"], list):
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
                 entry["value"].extend(values)
-                self._condition.notify_all()
             else:
                 self._store[key] = {"value": list(values)}
+
+            self._condition.notify_all()
             return len(self._store[key]["value"])
 
     def lpush(self, key: str, *values: str) -> int:
@@ -57,9 +58,10 @@ class Database:
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
                 for value in values:
                     entry["value"].insert(0, value)
-                self._condition.notify_all()
             else:
                 self._store[key] = {"value": list(reversed(values))}
+            
+            self._condition.notify_all()
             return len(self._store[key]["value"])
 
     def lrange(self, key: str, start: int, stop: int) -> list:
@@ -115,6 +117,7 @@ class Database:
     def lpop(self, key: str, val=1) -> list:
         with self._condition:
             entry = self._store.get(key)
+
             if entry:
                 if not isinstance(entry["value"], list):
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -130,22 +133,21 @@ class Database:
 
     def blpop(self, key: str, timeout: float) -> list:
         end_time = time.time() + timeout
-    
+
         with self._condition:
             while True:
                 entry = self._store.get(key)
-    
+
                 if entry:
                     if not isinstance(entry["value"], list):
                         raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
-    
+
                     if entry["value"]:
                         value = entry["value"].pop(0)
                         return [key, value]
-    
+
                 remaining = end_time - time.time()
                 if timeout > 0 and remaining <= 0:
                     return []
-    
+
                 self._condition.wait(timeout=remaining if timeout > 0 else None)
-    
