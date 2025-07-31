@@ -47,7 +47,7 @@ class Database:
             else:
                 self._store[key] = {"value": list(values)}
 
-            self._condition.notify_all()
+            self._condition.notify()
             return len(self._store[key]["value"])
 
     def lpush(self, key: str, *values: str) -> int:
@@ -61,7 +61,7 @@ class Database:
             else:
                 self._store[key] = {"value": list(reversed(values))}
             
-            self._condition.notify_all()
+            self._condition.notify()
             return len(self._store[key]["value"])
 
     def lrange(self, key: str, start: int, stop: int) -> list:

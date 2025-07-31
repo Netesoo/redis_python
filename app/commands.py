@@ -156,7 +156,7 @@ def cmd_blpop(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
     if not result:
-        return b"$-1\r\n".encode()
+        return b"$-1\r\n"
 
     response = f"*2\r\n${len(result[0])}\r\n{result[0]}\r\n${len(result[1])}\r\n{result[1]}\r\n"
     return response.encode()
