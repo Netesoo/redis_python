@@ -1,25 +1,31 @@
+from app.resp import (
+    RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray,
+    ok, pong, error, wrongtype_error, null_bulk_string
+)
+
+
 def handle_command(command, args, database):
     func = COMMANDS.get(command.upper())
     if not func:
-        return b"-ERR unknown command\r\n"
-    return func(args, database)
+        return error("unknown command").encode()
+    
+    response = func(args, database)
+    return response.encode() if hasattr(response, 'encode') else response
 
 
 def cmd_echo(args, database):
     if len(args) != 1:
-            return b"-ERR wrong number of arguments\r\n"
-    msg = args[0]
-    return f"${len(msg)}\r\n{msg}\r\n".encode()
+        return error("wrong number of arguments")
+    return RESPBulkString(args[0])
 
 
 def cmd_ping(args, database):
-    msg = "PONG"
-    return f"+PONG\r\n".encode()
+    return pong()
 
 
 def cmd_set(args, database):
     if len(args) not in (2, 4):
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
 
     key = args[0]
     value = args[1]
@@ -27,142 +33,148 @@ def cmd_set(args, database):
     px = None
     if len(args) == 4:
         if args[2].upper() != "PX":
-            return b"-ERR only PX option suported\r\n"
+            return error("only PX option supported")
         try:
             px = int(args[3])
         except ValueError:
-            return b"-ERR PX value must be an integer\r\n"
+            return error("PX value must be an integer")
 
     database.set(key, value, px=px)
-    return b"+OK\r\n"
+    return ok()
 
 
 def cmd_get(args, database):
     if len(args) != 1:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
     
     value = database.get(args[0])
     if value is None:
-        return b"$-1\r\n"
+        return null_bulk_string()
     
-    return f"${len(value)}\r\n{value}\r\n".encode()
+    return RESPBulkString(value)
 
 
 def cmd_rpush(args, database):
     if len(args) < 2:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
     
     key = args[0]
     values = args[1:]
 
     try:
         new_len = database.rpush(key, *values)
-        return f":{new_len}\r\n".encode()
+        return RESPInteger(new_len)
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
 
 def cmd_lpush(args, database):
     if len(args) < 2:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
 
     key = args[0]
     values = args[1:]
 
     try:
         new_len = database.lpush(key, *values)
-        return f":{new_len}\r\n".encode()
+        return RESPInteger(new_len)
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
 
 def cmd_lrange(args, database):
     if len(args) != 3:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
 
     key = args[0]
     try:
         start = int(args[1])
         stop = int(args[2])
     except ValueError:
-        return b"-ERR value is not an integer or out of range\r\n"
+        return error("value is not an integer or out of range")
 
     try:
         result = database.lrange(key, start, stop)
-        response = f"*{len(result)}\r\n"
-        for item in result:
-            response += f"${len(item)}\r\n{item}\r\n"
-
-        if result == []:
-            return f"*0\r\n".encode()
-
-        return response.encode()
+        return RESPArray(result)
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
 
 def cmd_llen(args, database):
     if len(args) != 1:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
 
     key = args[0]
 
     try:
         result = database.llen(key)
-        return f":{result}\r\n".encode()
+        return RESPInteger(result)
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
 
 def cmd_lpop(args, database):
     if len(args) < 1:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
     elif len(args) == 2:
         try:
             val = int(args[1])
         except ValueError:
-            return b"-ERR value is not an integer\r\n"
-    else: val = 1
+            return error("value is not an integer")
+    else: 
+        val = 1
     
     key = args[0]
     try:
         result = database.lpop(key, val)
-        if val > 1:
-            response = f"*{len(result)}\r\n"
-            for item in result:
-                response += f"${len(item)}\r\n{item}\r\n"
-            return response.encode()
-        elif result == []:
-            return f"$-1\r\n".encode()
-        else: return f"${len(result[0])}\r\n{result[0]}\r\n".encode()
+        
+        if not result:  # Pusta lista
+            return null_bulk_string()
+        
+        if val == 1:
+            return RESPBulkString(result[0])
+        else:
+            return RESPArray(result)
 
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
 
 def cmd_blpop(args, database):
     if len(args) != 2:
-        return b"-ERR wrong number of arguments\r\n"
+        return error("wrong number of arguments")
 
     key = args[0]
     try:
         timeout = float(args[1])
     except ValueError:
-        return b"-ERR value is not a double\r\n"
+        return error("value is not a double")
     
     try:
         result = database.blpop(key, timeout)
     except TypeError:
-        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+        return wrongtype_error()
 
     if not result:
-        return b"$-1\r\n"
+        return null_bulk_string()
 
-    response = f"*2\r\n${len(result[0])}\r\n{result[0]}\r\n${len(result[1])}\r\n{result[1]}\r\n"
-    return response.encode()
-
+    return RESPArray([result[0], result[1]])
 
 
+def cmd_incr(args, database):
+    if len(args) != 1:
+        return error("wrong number of arguments")
+
+    key = args[0]
+
+    try:
+        result = database.incr(key)
+    except TypeError:
+        return wrongtype_error()
+
+    return RESPInteger(result)
+
+    
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -174,4 +186,5 @@ COMMANDS = {
     "LLEN": cmd_llen,
     "LPOP": cmd_lpop,
     "BLPOP": cmd_blpop,
+    "INCR": cmd_incr,
 }

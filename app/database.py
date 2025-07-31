@@ -12,12 +12,14 @@ class Database:
         self._store = {}
         self._condition = threading.Condition()
 
+
     def set(self, key: str, value: Any, px: int = None):
         with self._condition:
             entry = {"value": value}
             if px:
                 entry["expires_at"] = current_millis() + px
             self._store[key] = entry
+
 
     def get(self, key: str) -> Any | None:
         with self._condition:
@@ -31,6 +33,7 @@ class Database:
                 return None
 
             return entry["value"]
+
 
     def delete(self, key: str):
         with self._condition:
@@ -50,6 +53,7 @@ class Database:
             self._condition.notify()
             return len(self._store[key]["value"])
 
+
     def lpush(self, key: str, *values: str) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -63,6 +67,7 @@ class Database:
             
             self._condition.notify()
             return len(self._store[key]["value"])
+
 
     def lrange(self, key: str, start: int, stop: int) -> list:
         with self._condition:
@@ -151,3 +156,16 @@ class Database:
                     return []
 
                 self._condition.wait(timeout=remaining if timeout > 0 else None)
+
+
+    def incr(self, key: str) -> int:
+        with self._condition:
+            entry = self._store.get(key)
+            
+            try:
+                result = int(entry['value']) + 1
+            except ValueError:
+                return 0
+
+            return result
+            

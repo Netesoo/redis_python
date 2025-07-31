@@ -1,5 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
+from typing import List, Union, Any
 
 
 class RESPType(bytes, Enum):
@@ -14,6 +15,77 @@ class RESPType(bytes, Enum):
 class RESPValue():
     type: RESPType
     value: any
+
+
+class RESPSimpleString:
+    def __init__(self, value: str):
+        self.value = value
+    
+    def encode(self) -> bytes:
+        return f"+{self.value}\r\n".encode()
+
+
+class RESPError:
+    def __init__(self, message: str):
+        self.message = message
+    
+    def encode(self) -> bytes:
+        return f"-{self.message}\r\n".encode()
+
+
+class RESPInteger:
+    def __init__(self, value: int):
+        self.value = value
+    
+    def encode(self) -> bytes:
+        return f":{self.value}\r\n".encode()
+
+
+class RESPBulkString:
+    def __init__(self, value: str = None):
+        self.value = value
+    
+    def encode(self) -> bytes:
+        if self.value is None:
+            return b"$-1\r\n"
+        return f"${len(self.value)}\r\n{self.value}\r\n".encode()
+
+
+class RESPArray:
+    def __init__(self, items: List[Union[str, 'RESPBulkString', 'RESPInteger', Any]] = None):
+        self.items = items or []
+    
+    def encode(self) -> bytes:
+        if not self.items:
+            return b"*0\r\n"
+        
+        response = f"*{len(self.items)}\r\n"
+        for item in self.items:
+            if isinstance(item, str):
+                response += f"${len(item)}\r\n{item}\r\n"
+            elif hasattr(item, 'encode'):
+                response += item.encode().decode()
+            else:
+                str_item = str(item)
+                response += f"${len(str_item)}\r\n{str_item}\r\n"
+        
+        return response.encode()
+
+
+def ok() -> RESPSimpleString:
+    return RESPSimpleString("OK")
+
+def pong() -> RESPSimpleString:
+    return RESPSimpleString("PONG")
+
+def error(message: str) -> RESPError:
+    return RESPError(f"ERR {message}")
+
+def wrongtype_error() -> RESPError:
+    return RESPError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+def null_bulk_string() -> RESPBulkString:
+    return RESPBulkString(None)
 
 
 def parse_resp_with_offset(data: bytes, offset: int) -> tuple[RESPValue, int]:
@@ -68,3 +140,8 @@ def read_line(data: bytes, start: int) -> tuple[bytes, int]:
     if end == -1:
         raise ValueError("Missing lines")
     return data[start:end], end + 2
+
+
+class IncompleteRESPError(Exception):
+    """Raised when RESP data is incomplete"""
+    pass

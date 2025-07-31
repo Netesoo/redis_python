@@ -1,14 +1,14 @@
 from app.commands import handle_command
-from app.resp import RESPType, RESPValue, parse_resp_with_offset
+from app.resp import RESPType, RESPValue, parse_resp_with_offset, IncompleteRESPError, error
 
 
 def handle_parsed_value(resp_value: RESPValue, database):
     if resp_value.type != RESPType.ARRAY:
-        return b"-ERR expected array\r\n"
+        return error("expected array").encode()
 
     items = resp_value.value
     if not items or items[0].type != RESPType.BULK_STRING:
-        return b"-ERR invalid command format\r\n"
+        return error("invalid command format").encode()
 
     command = items[0].value.upper()
     args = [item.value for item in items[1:]]
@@ -24,8 +24,6 @@ def handle_client(client, database):
         while offset < len(buffer):
             try:
                 value, offset = parse_resp_with_offset(buffer, offset)
-#                print(f"Got: {value.value}")
-
                 client.sendall(handle_parsed_value(value, database))
             except IncompleteRESPError:
                 break
