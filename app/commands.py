@@ -172,6 +172,8 @@ def cmd_incr(args, database):
     except TypeError:
         return wrongtype_error()
 
+    if result == -1:
+        return error("value is not an integer or out of range")
     return RESPInteger(result)
 
 

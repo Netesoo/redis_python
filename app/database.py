@@ -161,7 +161,7 @@ class Database:
     def incr(self, key: str) -> int:
         with self._condition:
             entry = self._store.get(key)
-            
+
             if entry == None:
                 entry = {"value": 0}
 
@@ -169,7 +169,7 @@ class Database:
                 result = int(entry['value']) + 1
                 entry = {"value": f"{result}"}
             except ValueError:
-                return 0
+                return -1
 
             self._store[key] = entry
             return result
