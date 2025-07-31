@@ -162,10 +162,15 @@ class Database:
         with self._condition:
             entry = self._store.get(key)
             
+            if entry == None:
+                entry = {"value": 0}
+
             try:
                 result = int(entry['value']) + 1
+                entry = {"value": f"{result}"}
             except ValueError:
                 return 0
 
+            self._store[key] = entry
             return result
             

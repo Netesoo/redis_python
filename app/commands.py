@@ -174,7 +174,7 @@ def cmd_incr(args, database):
 
     return RESPInteger(result)
 
-    
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
