@@ -10,17 +10,17 @@ def current_millis():
 class Database:
     def __init__(self):
         self._store = {}
-        self._lock = threading.Lock()
+        self._condition = threading.Condition()
 
     def set(self, key: str, value: Any, px: int = None):
-        with self._lock:
+        with self._condition:
             entry = {"value": value}
             if px:
                 entry["expires_at"] = current_millis() + px
             self._store[key] = entry
 
     def get(self, key: str) -> Any | None:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
             if not entry:
                 return None
@@ -33,35 +33,37 @@ class Database:
             return entry["value"]
 
     def delete(self, key: str):
-        with self._lock:
+        with self._condition:
             if key in self._store:
                 del self._store[key]
 
     def rpush(self, key: str, *values: str) -> int:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
             if entry:
                 if not isinstance(entry["value"], list):
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
                 entry["value"].extend(values)
+                self._condition.notify_all()
             else:
                 self._store[key] = {"value": list(values)}
             return len(self._store[key]["value"])
 
     def lpush(self, key: str, *values: str) -> int:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
             if entry:
                 if not isinstance(entry["value"], list):
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
                 for value in values:
                     entry["value"].insert(0, value)
+                self._condition.notify_all()
             else:
                 self._store[key] = {"value": list(reversed(values))}
             return len(self._store[key]["value"])
 
     def lrange(self, key: str, start: int, stop: int) -> list:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
 
             if not entry:
@@ -99,7 +101,7 @@ class Database:
 
 
     def llen(self, key: str) -> int:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
             if entry:
                 if not isinstance(entry["value"], list):
@@ -111,7 +113,7 @@ class Database:
 
 
     def lpop(self, key: str, val=1) -> list:
-        with self._lock:
+        with self._condition:
             entry = self._store.get(key)
             if entry:
                 if not isinstance(entry["value"], list):
@@ -124,3 +126,21 @@ class Database:
                 lst.append(entry["value"].pop(0))
 
             return lst
+
+
+    def blpop(self, key: str, timeout: float) -> list:
+        end_time = time.time() + timeout
+    
+        with self._condition:
+            while True:
+                entry = self._store.get(key)
+    
+                if entry and isinstance(entry["value"], list) and entry["value"]:
+                    value = entry["value"].pop(0)
+                    return [key, value]
+    
+                remaining = time.time() - end_time
+                if remaining <= 0:
+                    return []
+    
+                self._condition.wait(timeout=remaining)

@@ -76,7 +76,6 @@ def cmd_lpush(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
 
-
 def cmd_lrange(args, database):
     if len(args) != 3:
         return b"-ERR wrong number of arguments\r\n"
@@ -141,6 +140,29 @@ def cmd_lpop(args, database):
         return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 
 
+def cmd_blpop(args, database):
+    if len(args) != 2:
+        return b"-ERR wrong number of arguments\r\n"
+
+    key = args[0]
+    try:
+        timeout = float(args[1])
+    except ValueError:
+        return b"-ERR value is not a double\r\n"
+    
+    try:
+        result = database.blpop(key, timeout)
+    except TypeError:
+        return b"-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+
+    if not result:
+        return b"*0\r\n"
+
+    response = f"*2\r\n${len(result[0])}\r\n{result[0]}\r\n${len(result[1])}\r\n{result[1]}\r\n"
+    return response.encode()
+
+
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -151,4 +173,5 @@ COMMANDS = {
     "LRANGE": cmd_lrange,
     "LLEN": cmd_llen,
     "LPOP": cmd_lpop,
+    "BLPOP": cmd_blpop,
 }
