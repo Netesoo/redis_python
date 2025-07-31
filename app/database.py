@@ -135,12 +135,17 @@ class Database:
             while True:
                 entry = self._store.get(key)
     
-                if entry and isinstance(entry["value"], list) and entry["value"]:
-                    value = entry["value"].pop(0)
-                    return [key, value]
+                if entry:
+                    if not isinstance(entry["value"], list):
+                        raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
     
-                remaining = time.time() - end_time
-                if remaining <= 0:
+                    if entry["value"]:
+                        value = entry["value"].pop(0)
+                        return [key, value]
+    
+                remaining = end_time - time.time()
+                if timeout > 0 and remaining <= 0:
                     return []
     
-                self._condition.wait(timeout=remaining)
+                self._condition.wait(timeout=remaining if timeout > 0 else None)
+    
