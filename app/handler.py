@@ -2,7 +2,7 @@ from app.commands import handle_command
 from app.resp import RESPType, RESPValue, parse_resp_with_offset, IncompleteRESPError, error
 
 
-def handle_parsed_value(resp_value: RESPValue, database):
+def handle_parsed_value(resp_value: RESPValue, database, context):
     if resp_value.type != RESPType.ARRAY:
         return error("expected array").encode()
 
@@ -12,11 +12,16 @@ def handle_parsed_value(resp_value: RESPValue, database):
 
     command = items[0].value.upper()
     args = [item.value for item in items[1:]]
-    return handle_command(command, args, database)
+    return handle_command(command, args, database, context)
 
 
 def handle_client(client, database):
     buffer = b""
+    context = {
+        "in_transaction": False,
+        "transaction_queue": []
+    }
+
     while data := client.recv(1024):
         buffer += data
         offset = 0
@@ -24,7 +29,7 @@ def handle_client(client, database):
         while offset < len(buffer):
             try:
                 value, offset = parse_resp_with_offset(buffer, offset)
-                client.sendall(handle_parsed_value(value, database))
+                client.sendall(handle_parsed_value(value, database, context))
             except IncompleteRESPError:
                 break
         

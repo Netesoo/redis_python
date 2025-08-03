@@ -1,4 +1,5 @@
 from typing import Any
+from abc import ABC, abstractmethod
 import time
 import threading
 
@@ -7,7 +8,50 @@ def current_millis():
     return int(time.time() * 1000)
 
 
-class Database:
+class IDatebase(ABC):
+    @abstractmethod
+    def set(self, key: str, value: Any, px: int = None) -> None:
+        pass
+        
+    @abstractmethod
+    def get(self, key: str) -> Any | None:
+        pass
+
+    @abstractmethod
+    def delete(self, key: str) -> None:
+        pass
+
+    @abstractmethod
+    def rpush(self, key: str, *values: str) -> int:
+        pass
+
+    @abstractmethod
+    def lpush(self, key: str, *values: str) -> int:
+        pass
+        
+    @abstractmethod
+    def lrange(self, key: str, start: int, stop: int) -> list:
+        pass
+        
+    @abstractmethod
+    def llen(self, key: str) -> int:
+        pass
+        
+    @abstractmethod
+    def lpop(self, key: str, val=1) -> list:
+        pass
+        
+    @abstractmethod
+    def blpop(self, key: str, timeout: float) -> list:
+        pass
+        
+    @abstractmethod
+    def incr(self, key: str) -> int:
+        pass
+        
+
+
+class Database(IDatebase):
     def __init__(self):
         self._store = {}
         self._condition = threading.Condition()
@@ -39,6 +83,7 @@ class Database:
         with self._condition:
             if key in self._store:
                 del self._store[key]
+
 
     def rpush(self, key: str, *values: str) -> int:
         with self._condition:
@@ -173,4 +218,6 @@ class Database:
 
             self._store[key] = entry
             return result
-            
+
+    
+#    def multi(self)

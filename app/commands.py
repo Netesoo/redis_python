@@ -4,26 +4,30 @@ from app.resp import (
 )
 
 
-def handle_command(command, args, database):
+def handle_command(command, args, database, context):
     func = COMMANDS.get(command.upper())
     if not func:
         return error("unknown command").encode()
     
-    response = func(args, database)
+    if context.get("in_transaction") and command.upper() not in ("MULTI", "EXEC", "DISCARD"):
+        context["transaction_queue"].append((command, args))
+        return RESPSimpleString("QUEUED").encode()
+
+    response = func(args, database, context)
     return response.encode() if hasattr(response, 'encode') else response
 
 
-def cmd_echo(args, database):
+def cmd_echo(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
     return RESPBulkString(args[0])
 
 
-def cmd_ping(args, database):
+def cmd_ping(args, database, context):
     return pong()
 
 
-def cmd_set(args, database):
+def cmd_set(args, database, context):
     if len(args) not in (2, 4):
         return error("wrong number of arguments")
 
@@ -43,7 +47,7 @@ def cmd_set(args, database):
     return ok()
 
 
-def cmd_get(args, database):
+def cmd_get(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
     
@@ -54,7 +58,7 @@ def cmd_get(args, database):
     return RESPBulkString(value)
 
 
-def cmd_rpush(args, database):
+def cmd_rpush(args, database, context):
     if len(args) < 2:
         return error("wrong number of arguments")
     
@@ -68,7 +72,7 @@ def cmd_rpush(args, database):
         return wrongtype_error()
 
 
-def cmd_lpush(args, database):
+def cmd_lpush(args, database, context):
     if len(args) < 2:
         return error("wrong number of arguments")
 
@@ -82,7 +86,7 @@ def cmd_lpush(args, database):
         return wrongtype_error()
 
 
-def cmd_lrange(args, database):
+def cmd_lrange(args, database, context):
     if len(args) != 3:
         return error("wrong number of arguments")
 
@@ -100,7 +104,7 @@ def cmd_lrange(args, database):
         return wrongtype_error()
 
 
-def cmd_llen(args, database):
+def cmd_llen(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
 
@@ -113,34 +117,35 @@ def cmd_llen(args, database):
         return wrongtype_error()
 
 
-def cmd_lpop(args, database):
-    if len(args) < 1:
+def cmd_lpop(args, database, context):
+    if len(args) not in (1, 2):
         return error("wrong number of arguments")
-    elif len(args) == 2:
-        try:
-            val = int(args[1])
-        except ValueError:
-            return error("value is not an integer")
-    else: 
-        val = 1
     
     key = args[0]
+    value = 1
+    
+    if len(args) == 2:
+        try:
+            value = int(args[1])
+            if value < 0:
+                return error("value cannot be negative")
+        except ValueError:
+            return error("value is not an integer")
     try:
-        result = database.lpop(key, val)
+        result = self.database.lpop(key, value)
         
-        if not result:  # Pusta lista
+        if not result:
             return null_bulk_string()
         
-        if val == 1:
+        if value == 1:
             return RESPBulkString(result[0])
         else:
             return RESPArray(result)
-
     except TypeError:
         return wrongtype_error()
 
 
-def cmd_blpop(args, database):
+def cmd_blpop(args, database, context):
     if len(args) != 2:
         return error("wrong number of arguments")
 
@@ -161,7 +166,7 @@ def cmd_blpop(args, database):
     return RESPArray([result[0], result[1]])
 
 
-def cmd_incr(args, database):
+def cmd_incr(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
 
@@ -177,6 +182,41 @@ def cmd_incr(args, database):
     return RESPInteger(result)
 
 
+def cmd_multi(args, database, context):
+    context["in_transaction"] = True
+    context["transaction_queue"] = []
+    return ok()
+
+
+def cmd_exec(args, database, context):
+    if not context.get("in_transaction"):
+        return error("EXEC without MULTI")
+
+    responses = []
+    for cmd, cmd_args in context["transaction_queue"]:
+        func = COMMANDS.get(cmd.upper())
+        
+        if not func:
+            responses.append(error("unknow command"))
+            continue
+        
+        try:
+            resp = func(cmd_args, database, context)
+        except Exception as e:
+            resp = error(str(e))
+        responses.append(resp)
+
+    context["in_treansaction"] = False
+    context["transaction_queue"] = []
+    return RESPArray(responses)
+
+
+def cmd_discard(args, database, context):
+    context["in_treansaction"] = False
+    context["transaction_queue"] = []
+    return ok()
+
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -189,4 +229,7 @@ COMMANDS = {
     "LPOP": cmd_lpop,
     "BLPOP": cmd_blpop,
     "INCR": cmd_incr,
+    "MULTI": cmd_multi,
+    "EXEC": cmd_exec,
+    "DISCARD": cmd_discard
 }
