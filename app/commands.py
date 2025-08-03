@@ -189,7 +189,6 @@ def cmd_multi(args, database, context):
 
 
 def cmd_exec(args, database, context):
-    print(context.get("in_transaction"))
     if not context.get("in_transaction"):
         return error("EXEC without MULTI")
 
@@ -213,7 +212,10 @@ def cmd_exec(args, database, context):
 
 
 def cmd_discard(args, database, context):
-    context["in_treansaction"] = False
+    if not context.get("in_transaction"):
+        return error("DISCARD without MULTI")
+
+    context["in_transaction"] = False
     context["transaction_queue"] = []
     return ok()
 
