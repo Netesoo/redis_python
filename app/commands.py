@@ -132,7 +132,7 @@ def cmd_lpop(args, database, context):
         except ValueError:
             return error("value is not an integer")
     try:
-        result = self.database.lpop(key, value)
+        result = database.lpop(key, value)
         
         if not result:
             return null_bulk_string()
@@ -197,7 +197,7 @@ def cmd_exec(args, database, context):
         func = COMMANDS.get(cmd.upper())
         
         if not func:
-            responses.append(error("unknow command"))
+            responses.append(error("unknown command"))
             continue
         
         try:
@@ -220,6 +220,31 @@ def cmd_discard(args, database, context):
     return ok()
 
 
+def cmd_config(args, database, context):
+    if len(args) < 1:
+        return error("wrong number of arguments")
+
+    subcommand = args[0].upper()
+
+    if subcommand == "GET":
+       if len(args) != 2:
+           return error("wrong number of arguments")
+       return cmd_config_get(args[1], database, context)
+    else:
+        return error(f"unknown CONFIG subcommand: {subcommand}")
+
+
+def cmd_config_get(parameter, database, context):
+    config = context.get("config", {})
+
+    if parameter == "dir":
+        return RESPArray(["dir", config.dir])
+    elif parameter == "dbfilename":
+        return RESPArray(["dbfilename", config.dbfilename])
+    else:
+        return RESPArray([])
+
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -234,5 +259,6 @@ COMMANDS = {
     "INCR": cmd_incr,
     "MULTI": cmd_multi,
     "EXEC": cmd_exec,
-    "DISCARD": cmd_discard
+    "DISCARD": cmd_discard,
+    "CONFIG": cmd_config,
 }

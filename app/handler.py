@@ -1,5 +1,5 @@
 from app.commands import handle_command
-from app.resp import RESPType, RESPValue, parse_resp_with_offset, IncompleteRESPError, error
+from app.resp import RESPType, RESPValue, parse_resp_with_offset, error
 
 
 def handle_parsed_value(resp_value: RESPValue, database, context):
@@ -15,11 +15,12 @@ def handle_parsed_value(resp_value: RESPValue, database, context):
     return handle_command(command, args, database, context)
 
 
-def handle_client(client, database):
+def handle_client(client, database, config=None):
     buffer = b""
     context = {
         "in_transaction": False,
-        "transaction_queue": []
+        "transaction_queue": [],
+        "config": config or {}
     }
 
     while data := client.recv(1024):
