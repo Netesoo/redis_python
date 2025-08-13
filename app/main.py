@@ -1,4 +1,4 @@
-import socket  # noqa: F401
+import socket
 import threading
 from app.database import Database
 from app.handler import handle_client
@@ -15,6 +15,11 @@ def _gether(database: Database, config: dict):
 def main():
     config = parse_args()
     database = Database()
+
+    rdb_path = f"{config.dir}/{config.dbfilename}"
+    print(config.dbfilename)
+    database.load_rdb(rdb_path)
+
     _gether(database, config)
 
 

@@ -1,3 +1,6 @@
+import fnmatch
+import time 
+
 from app.resp import (
     RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray,
     ok, pong, error, wrongtype_error, null_bulk_string
@@ -245,6 +248,42 @@ def cmd_config_get(parameter, database, context):
         return RESPArray([])
 
 
+def cmd_keys(args, database, context):
+    if len(args) != 1:
+        return error("wrong number of arguments")
+    
+    pattern = args[0]
+    print(f"KEYS pattern: '{pattern}' (type: {type(pattern)})")
+    
+    with database._condition:
+        keys = []
+        current_time = int(time.time() * 1000)
+        
+        for key, entry in database._store.items():
+            print(f"Checking key: {key}, entry: {entry}")
+            
+            expires_at = entry.get("expires_at")
+            if expires_at and current_time > expires_at:
+                print(f"Key {key} is expired")
+                continue
+            
+            print(f"Testing fnmatch.fnmatch('{key}', '{pattern}')")
+            match_result = fnmatch.fnmatch(key, pattern)  # Note: key first, pattern second
+            print(f"Match result: {match_result}")
+            
+            if match_result:
+                print(f"Key {key} matches pattern {pattern}")
+                keys.append(key)
+        
+        print(f"Returning keys: {keys}")
+    
+    return RESPArray(keys)
+
+
+def _match_pattern(key, pattern):
+    return fnmatch.fnmatch(key, pattern)
+
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -261,4 +300,5 @@ COMMANDS = {
     "EXEC": cmd_exec,
     "DISCARD": cmd_discard,
     "CONFIG": cmd_config,
+    "KEYS": cmd_keys,
 }

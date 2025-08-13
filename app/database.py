@@ -1,5 +1,7 @@
 from typing import Any
 from abc import ABC, abstractmethod
+from .rdb.reader import RDBReader
+from .rdb.writer import RDBWriter
 import time
 import threading
 
@@ -40,6 +42,23 @@ class Database:
         with self._condition:
             if key in self._store:
                 del self._store[key]
+
+
+    def save_rdb(self, filename: str):
+        writer = RDBWriter(self)
+        writer.write_rdb(filename)
+        
+
+    def load_rdb(self, filename: str):
+        reader = RDBReader(self)
+        reader.load_rdb(filename)
+        print(f"Trying to load RDB from: {filename}")
+        try:
+            print(f"Successfully loaded RDB, store now has: {list(self._store.keys())}")
+        except FileNotFoundError:
+            print(f"RDB file {filename} not found, starting with empty database")
+        except Exception as e:
+            print(f"Error loading RDB: {e}")
 
 
     def rpush(self, key: str, *values: str) -> int:
@@ -175,6 +194,3 @@ class Database:
 
             self._store[key] = entry
             return result
-
-    
-#    def multi(self)
