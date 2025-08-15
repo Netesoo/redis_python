@@ -228,5 +228,16 @@ class Database:
                     client.sendall(response.encode())
                 except Exception as e:
                     print(f"Error sending t client: {e}")
-                    self._subscriptions[chanel].remove(client)
+                    self._subscriptions[channel].remove(client)
             return len(subscribers)
+
+
+    def unsubscribe(self, channel:str, client: socket):
+        with self._condition:
+            if channel in self._subscriptions:
+                if client in self._subscriptions[channel]:
+                    self._subscriptions[channel].remove(client)
+                    print(f"Client unsubscribed from channel: {channel}")
+                if not self._subscriptions[channel]:
+                    del self._subscriptions[channel]
+    

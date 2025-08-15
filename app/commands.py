@@ -320,6 +320,26 @@ def cmd_publish(args, database, context):
     return RESPInteger(count)
 
 
+def cmd_unsubscribe(args, database, context):
+    if len(args) < 1:
+        return error("wrong number of arguments")
+
+    channel = args[0]
+    context["subscribed_channels"] = context.get("subscribed_channels", set())
+    
+    client_socket = context.get("client_socket")
+    if not client_socket:
+        return error("internal error: client socket not found")
+
+    database.unsubscribe(channel, client_socket)
+    context["subscribed_channels"].remove(channel)
+    return RESPArray([
+        RESPBulkString("unsubscribe"),
+        RESPBulkString(channel),
+        RESPInteger(len(context["subscribed_channels"]))
+    ])
+
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -342,4 +362,5 @@ COMMANDS = {
     "KEYS": cmd_keys,
     "SUBSCRIBE": cmd_subscribe,
     "PUBLISH": cmd_publish,
+    "UNSUCRIBE": cmd_unsubscribe
 }
