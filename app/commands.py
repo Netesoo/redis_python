@@ -285,10 +285,6 @@ def cmd_keys(args, database, context):
     return RESPArray(keys)
 
 
-def _match_pattern(key, pattern):
-    return fnmatch.fnmatch(key, pattern)
-
-
 def cmd_subscribe(args, database, context):
     if len(args) < 1:
         return error("wrong number of arguments")
@@ -312,6 +308,21 @@ def cmd_subscribe(args, database, context):
 
     return RESPArray(responses)
 
+
+def cmd_publish(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    channel = args[0]
+    message = args[1]
+
+    count = database.publish(channel, message)
+    return RESPInteger(count)
+
+
+def _match_pattern(key, pattern):
+    return fnmatch.fnmatch(key, pattern)
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -330,4 +341,5 @@ COMMANDS = {
     "CONFIG": cmd_config,
     "KEYS": cmd_keys,
     "SUBSCRIBE": cmd_subscribe,
+    "PUBLISH": cmd_publish,
 }

@@ -1,8 +1,14 @@
 from typing import Any
 from abc import ABC, abstractmethod
+from socket import socket
+
 from .rdb.reader import RDBReader
 from .rdb.writer import RDBWriter
-from socket import socket
+from app.resp import (
+    RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray,
+    ok, pong, error, wrongtype_error, null_bulk_string
+)
+
 import time
 import threading
 
@@ -207,3 +213,20 @@ class Database:
                 print(f"Client subscribed to channel: {channel}")
                 
     
+    def publish(self, channel: str, message: str) -> int:
+        while self._condition:
+            if channel not in self._subscriptions:
+                return 0
+            subscribers = self._subscriptions[channel]
+            for client in subscribers[:]:
+                try:
+                    response = RESPArray([
+                        RESPBulkString("message"),
+                        RESPBulkString(channel),
+                        RESPBulkString(message)
+                    ])
+                    client.sendall(response.encode())
+                except Exception as e:
+                    print(f"Error sending t client: {e}")
+                    self._subscriptions[chanel].remove(client)
+            return len(subscribers)
