@@ -30,6 +30,8 @@ def cmd_echo(args, database, context):
 
 
 def cmd_ping(args, database, context):
+    if context.get("in_subscription"):
+        return RESPArray([RESPBulkString("pong"), RESPBulkString("")])
     return pong()
 
 
