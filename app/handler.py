@@ -12,7 +12,11 @@ def handle_parsed_value(resp_value: RESPValue, database, context):
 
     command = items[0].value.upper()
     args = [item.value for item in items[1:]]
-    return handle_command(command, args, database, context)
+    #return handle_command(command, args, database, context)
+
+    if command == "QUIT":
+        return handle_command(command, args, database, context), True
+    return handle_command(command, args, database, context), False
 
 
 def handle_client(client, database, config=None):
@@ -20,6 +24,8 @@ def handle_client(client, database, config=None):
     context = {
         "in_transaction": False,
         "transaction_queue": [],
+        "in_subscription": False,
+        "subscribed_channels": set(),
         "config": config or {},
         "client_socket": client
     }
@@ -31,9 +37,11 @@ def handle_client(client, database, config=None):
         while offset < len(buffer):
             try:
                 value, offset = parse_resp_with_offset(buffer, offset)
-                response = handle_parsed_value(value, database, context)
+                response, should_close = handle_parsed_value(value, database, context)
                 if response:
                     client.sendall(response)
+                if should_close:
+                    break
             except IncompleteRESPError:
                 break
             except Exception as e:
@@ -45,3 +53,4 @@ def handle_client(client, database, config=None):
     if context.get("in_subscription"):
         for channel in context["subscribed_channels"]:
             database.unsubscribe(channel, client)
+    client.close()

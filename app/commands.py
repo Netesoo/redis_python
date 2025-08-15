@@ -9,7 +9,7 @@ from app.resp import (
 
 def handle_command(command, args, database, context):
     if context.get("in_subscription") and command.upper() not in ("SUBSCRIBE", "UNSUBSCRIBE", "PING", "QUIT", "RESET"):
-        return error("ERR only SUBSCRIBE, UNSUBSCRIBE, PING, QUIT, and RESET allowed in subscription mode").encode()
+        return error(f"Can't execute '{command}': only SUBSCRIBE, UNSUBSCRIBE, PING, QUIT, and RESET allowed in subscription mode").encode()
 
     func = COMMANDS.get(command.upper())
     if not func:
@@ -291,7 +291,7 @@ def cmd_subscribe(args, database, context):
     if len(args) < 1:
         return error("wrong number of arguments")
 
-    context["in_subscryption"] = True
+    context["in_subscription"] = True
     context["subscribed_channels"] = context.get("subscribed_channels", set())
 
     responses = []
