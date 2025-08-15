@@ -362,5 +362,5 @@ COMMANDS = {
     "KEYS": cmd_keys,
     "SUBSCRIBE": cmd_subscribe,
     "PUBLISH": cmd_publish,
-    "UNSUCRIBE": cmd_unsubscribe
+    "UNSUBSCRIBE": cmd_unsubscribe
 }
