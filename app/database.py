@@ -2,6 +2,7 @@ from typing import Any
 from abc import ABC, abstractmethod
 from .rdb.reader import RDBReader
 from .rdb.writer import RDBWriter
+from socket import socket
 import time
 import threading
 
@@ -14,6 +15,7 @@ class Database:
     def __init__(self):
         self._store = {}
         self._condition = threading.Condition()
+        self._subscriptions = {}
 
 
     def set(self, key: str, value: Any, px: int = None):
@@ -194,3 +196,14 @@ class Database:
 
             self._store[key] = entry
             return result
+
+
+    def subscribe(self, channel: str, client: socket):
+        with self._condition:
+            if channel not in self._subscriptions:
+                self._subscriptions[channel] = []
+            if client not in self._subscriptions[channel]:
+                self._subscriptions[channel].append(client)
+                print(f"Client subscribed to channel: {channel}")
+                
+    

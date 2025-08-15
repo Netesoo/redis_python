@@ -284,6 +284,29 @@ def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
 
+def cmd_subscribe(args, database, context):
+    if len(args) < 1:
+        return error("wrong number of arguments")
+
+    context["in_subscryption"] = True
+    context["subscribed_channels"] = context.get("subscribed_channels", set())
+
+    responses = []
+    client_socket = context.get("client_socket")
+    if not client_socket:
+        return error("internal error: client socket not found")
+
+    for channel in args:
+        database.subscribe(channel, client_socket)
+        context["subscribed_channels"].add(channel)
+        responses.extend([
+            RESPBulkString("subscribe"),
+            RESPBulkString(channel),
+            RESPInteger(len(context["subscribed_channels"]))
+        ])
+
+    return RESPArray(responses)
+
 COMMANDS = {
     "PING": cmd_ping,
     "ECHO": cmd_echo,
@@ -301,4 +324,5 @@ COMMANDS = {
     "DISCARD": cmd_discard,
     "CONFIG": cmd_config,
     "KEYS": cmd_keys,
+    "SUBSCRIBE": cmd_subscribe,
 }

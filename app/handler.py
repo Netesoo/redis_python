@@ -20,7 +20,8 @@ def handle_client(client, database, config=None):
     context = {
         "in_transaction": False,
         "transaction_queue": [],
-        "config": config or {}
+        "config": config or {},
+        "client_socket": client
     }
 
     while data := client.recv(1024):
@@ -30,8 +31,17 @@ def handle_client(client, database, config=None):
         while offset < len(buffer):
             try:
                 value, offset = parse_resp_with_offset(buffer, offset)
-                client.sendall(handle_parsed_value(value, database, context))
+                response = handle_parsed_value(value, database, context)
+                if response:
+                    client.sendall(response)
             except IncompleteRESPError:
+                break
+            except Exception as e:
+                print(f"Error handling client: {e}")
                 break
         
         buffer = buffer[offset:]
+    
+    if context.get("in_subscription"):
+        for channel in context["subscribed_channels"]:
+            database.unsubscribe(channel, client)
