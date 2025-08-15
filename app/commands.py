@@ -8,6 +8,9 @@ from app.resp import (
 
 
 def handle_command(command, args, database, context):
+    if context.get("in_subscription") and command.upper() not in ("SUBSCRIBE", "UNSUBSCRIBE", "PING", "QUIT", "RESET"):
+        return error("ERR only SUBSCRIBE, UNSUBSCRIBE, PING, QUIT, and RESET allowed in subscription mode").encode()
+
     func = COMMANDS.get(command.upper())
     if not func:
         return error("unknown command").encode()
