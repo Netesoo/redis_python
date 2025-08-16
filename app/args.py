@@ -1,13 +1,11 @@
 import argparse
 from dataclasses import dataclass
 
-
 @dataclass
 class Args:
     port: int = 6379
     dir: str | None = None
     dbfilename: str | None = None
-
 
 def parse_args() -> Args:
     argparser = argparse.ArgumentParser()

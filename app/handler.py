@@ -18,7 +18,6 @@ def handle_parsed_value(resp_value: RESPValue, database, context):
         return handle_command(command, args, database, context), True
     return handle_command(command, args, database, context), False
 
-
 def handle_client(client, database, config=None):
     buffer = b""
     context = {

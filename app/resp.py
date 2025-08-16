@@ -2,7 +2,6 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import List, Union, Any
 
-
 class RESPType(bytes, Enum):
     SIMPLE_STRING = b"+"
     ERROR = b"-"
@@ -10,12 +9,10 @@ class RESPType(bytes, Enum):
     BULK_STRING = b"$"
     ARRAY = b"*"
 
-
 @dataclass
 class RESPValue():
     type: RESPType
     value: any
-
 
 class RESPSimpleString:
     def __init__(self, value: str):
@@ -24,7 +21,6 @@ class RESPSimpleString:
     def encode(self) -> bytes:
         return f"+{self.value}\r\n".encode()
 
-
 class RESPError:
     def __init__(self, message: str):
         self.message = message
@@ -32,14 +28,12 @@ class RESPError:
     def encode(self) -> bytes:
         return f"-{self.message}\r\n".encode()
 
-
 class RESPInteger:
     def __init__(self, value: int):
         self.value = value
     
     def encode(self) -> bytes:
         return f":{self.value}\r\n".encode()
-
 
 class RESPBulkString:
     def __init__(self, value: str = None):
@@ -49,7 +43,6 @@ class RESPBulkString:
         if self.value is None:
             return b"$-1\r\n"
         return f"${len(self.value)}\r\n{self.value}\r\n".encode()
-
 
 class RESPArray:
     def __init__(self, items: List[Union[str, 'RESPBulkString', 'RESPInteger', Any]] = None):
@@ -71,7 +64,6 @@ class RESPArray:
         
         return response.encode()
 
-
 def ok() -> RESPSimpleString:
     return RESPSimpleString("OK")
 
@@ -86,7 +78,6 @@ def wrongtype_error() -> RESPError:
 
 def null_bulk_string() -> RESPBulkString:
     return RESPBulkString(None)
-
 
 def parse_resp_with_offset(data: bytes, offset: int) -> tuple[RESPValue, int]:
     if offset >= len(data):
@@ -134,13 +125,11 @@ def parse_resp_with_offset(data: bytes, offset: int) -> tuple[RESPValue, int]:
 
     raise NotImplementedError(f"Type {resp_type} not implemented")
 
-
 def read_line(data: bytes, start: int) -> tuple[bytes, int]:
     end = data.find(b"\r\n", start)
     if end == -1:
         raise ValueError("Missing lines")
     return data[start:end], end + 2
-
 
 class IncompleteRESPError(Exception):
     """Raised when RESP data is incomplete"""

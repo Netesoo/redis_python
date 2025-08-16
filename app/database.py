@@ -12,10 +12,8 @@ from app.resp import (
 import time
 import threading
 
-
 def current_millis():
     return int(time.time() * 1000)
-
 
 class Database:
     def __init__(self):
@@ -23,14 +21,12 @@ class Database:
         self._condition = threading.Condition()
         self._subscriptions = {}
 
-
     def set(self, key: str, value: Any, px: int = None):
         with self._condition:
             entry = {"value": value}
             if px:
                 entry["expires_at"] = current_millis() + px
             self._store[key] = entry
-
 
     def get(self, key: str) -> Any | None:
         with self._condition:
@@ -45,18 +41,15 @@ class Database:
 
             return entry["value"]
 
-
     def delete(self, key: str):
         with self._condition:
             if key in self._store:
                 del self._store[key]
 
-
     def save_rdb(self, filename: str):
         writer = RDBWriter(self)
         writer.write_rdb(filename)
         
-
     def load_rdb(self, filename: str):
         reader = RDBReader(self)
         reader.load_rdb(filename)
@@ -67,7 +60,6 @@ class Database:
             print(f"RDB file {filename} not found, starting with empty database")
         except Exception as e:
             print(f"Error loading RDB: {e}")
-
 
     def rpush(self, key: str, *values: str) -> int:
         with self._condition:
@@ -82,7 +74,6 @@ class Database:
             self._condition.notify()
             return len(self._store[key]["value"])
 
-
     def lpush(self, key: str, *values: str) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -96,7 +87,6 @@ class Database:
             
             self._condition.notify()
             return len(self._store[key]["value"])
-
 
     def lrange(self, key: str, start: int, stop: int) -> list:
         with self._condition:
@@ -135,7 +125,6 @@ class Database:
 
             return lst[start:stop + 1]
 
-
     def llen(self, key: str) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -146,7 +135,6 @@ class Database:
                 return 0
 
             return len(entry["value"])
-
 
     def lpop(self, key: str, val=1) -> list:
         with self._condition:
@@ -163,7 +151,6 @@ class Database:
                 lst.append(entry["value"].pop(0))
 
             return lst
-
 
     def blpop(self, key: str, timeout: float) -> list:
         end_time = time.time() + timeout
@@ -186,7 +173,6 @@ class Database:
 
                 self._condition.wait(timeout=remaining if timeout > 0 else None)
 
-
     def incr(self, key: str) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -203,7 +189,6 @@ class Database:
             self._store[key] = entry
             return result
 
-
     def subscribe(self, channel: str, client: socket):
         with self._condition:
             if channel not in self._subscriptions:
@@ -212,7 +197,6 @@ class Database:
                 self._subscriptions[channel].append(client)
                 print(f"Client subscribed to channel: {channel}")
                 
-    
     def publish(self, channel: str, message: str) -> int:
         while self._condition:
             if channel not in self._subscriptions:
@@ -231,7 +215,6 @@ class Database:
                     self._subscriptions[channel].remove(client)
             return len(subscribers)
 
-
     def unsubscribe(self, channel:str, client: socket):
         with self._condition:
             if channel in self._subscriptions:
@@ -241,7 +224,6 @@ class Database:
                 if not self._subscriptions[channel]:
                     del self._subscriptions[channel]
     
-
     def zadd(self, key: str, *score_members: tuple[float, str]) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -259,7 +241,6 @@ class Database:
 
             return added_count
 
-
     def zrank(self, key: str, member: str) -> int | None:
         with self._condition:
             entry = self._store.get(key)
@@ -269,7 +250,6 @@ class Database:
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
             return entry["value"].get_rank(member)
-    
 
     def zrange(self, key: str, start: int, stop: int) -> list | None:
         with self._condition:
@@ -308,7 +288,6 @@ class Database:
 
             return lst[start:stop + 1]
 
-
     def zcard(self, key: str) -> int:
         with self._condition:
             entry = self._store.get(key)
@@ -319,7 +298,6 @@ class Database:
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
             return len(entry["value"]._sorted_list)
-
 
     def zscore(self, key: str, member: str) -> str | None:
         with self._condition:
@@ -332,6 +310,16 @@ class Database:
 
         return str(entry["value"].get_score(member))
 
+    def zrem(self, key: str, member:str) -> int:
+        with self._condition:
+            entry = self._store.get(key)
+
+            if not entry:
+                return 0
+            if not isinstance(entry["value"], SortedSet):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+        return entry["value"].delete(member)
 
 class SortedSet:
     def __init__(self):
@@ -352,12 +340,18 @@ class SortedSet:
 
     def get_score(self, member):
         return self._members.get(member)
-    
+
     def get_rank(self, member):
         try:
             return self._sorted_list.index(member)
         except ValueError:
             return None
 
+    def delete(self, member):
+        if member in self._members:
+            self._sorted_list.remove(member)
+            return 1
+        return 0
+        
     def __len__(self):
         return len(self._sorted_list)

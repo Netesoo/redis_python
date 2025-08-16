@@ -6,7 +6,6 @@ from app.resp import (
     ok, pong, error, wrongtype_error, null_bulk_string
 )
 
-
 def handle_command(command, args, database, context):
     if context.get("in_subscription") and command.upper() not in ("SUBSCRIBE", "UNSUBSCRIBE", "PING", "QUIT", "RESET"):
         return error(f"Can't execute '{command}': only SUBSCRIBE, UNSUBSCRIBE, PING, QUIT, and RESET allowed in subscription mode").encode()
@@ -22,18 +21,15 @@ def handle_command(command, args, database, context):
     response = func(args, database, context)
     return response.encode() if hasattr(response, 'encode') else response
 
-
 def cmd_echo(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
     return RESPBulkString(args[0])
 
-
 def cmd_ping(args, database, context):
     if context.get("in_subscription"):
         return RESPArray([RESPBulkString("pong"), RESPBulkString("")])
     return pong()
-
 
 def cmd_set(args, database, context):
     if len(args) not in (2, 4):
@@ -54,7 +50,6 @@ def cmd_set(args, database, context):
     database.set(key, value, px=px)
     return ok()
 
-
 def cmd_get(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
@@ -64,7 +59,6 @@ def cmd_get(args, database, context):
         return null_bulk_string()
     
     return RESPBulkString(value)
-
 
 def cmd_rpush(args, database, context):
     if len(args) < 2:
@@ -79,7 +73,6 @@ def cmd_rpush(args, database, context):
     except TypeError:
         return wrongtype_error()
 
-
 def cmd_lpush(args, database, context):
     if len(args) < 2:
         return error("wrong number of arguments")
@@ -92,7 +85,6 @@ def cmd_lpush(args, database, context):
         return RESPInteger(new_len)
     except TypeError:
         return wrongtype_error()
-
 
 def cmd_lrange(args, database, context):
     if len(args) != 3:
@@ -111,7 +103,6 @@ def cmd_lrange(args, database, context):
     except TypeError:
         return wrongtype_error()
 
-
 def cmd_llen(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
@@ -123,7 +114,6 @@ def cmd_llen(args, database, context):
         return RESPInteger(result)
     except TypeError:
         return wrongtype_error()
-
 
 def cmd_lpop(args, database, context):
     if len(args) not in (1, 2):
@@ -152,7 +142,6 @@ def cmd_lpop(args, database, context):
     except TypeError:
         return wrongtype_error()
 
-
 def cmd_blpop(args, database, context):
     if len(args) != 2:
         return error("wrong number of arguments")
@@ -173,7 +162,6 @@ def cmd_blpop(args, database, context):
 
     return RESPArray([result[0], result[1]])
 
-
 def cmd_incr(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
@@ -189,12 +177,10 @@ def cmd_incr(args, database, context):
         return error("value is not an integer or out of range")
     return RESPInteger(result)
 
-
 def cmd_multi(args, database, context):
     context["in_transaction"] = True
     context["transaction_queue"] = []
     return ok()
-
 
 def cmd_exec(args, database, context):
     if not context.get("in_transaction"):
@@ -218,7 +204,6 @@ def cmd_exec(args, database, context):
     context["transaction_queue"] = []
     return RESPArray(responses)
 
-
 def cmd_discard(args, database, context):
     if not context.get("in_transaction"):
         return error("DISCARD without MULTI")
@@ -226,7 +211,6 @@ def cmd_discard(args, database, context):
     context["in_transaction"] = False
     context["transaction_queue"] = []
     return ok()
-
 
 def cmd_config(args, database, context):
     if len(args) < 1:
@@ -241,7 +225,6 @@ def cmd_config(args, database, context):
     else:
         return error(f"unknown CONFIG subcommand: {subcommand}")
 
-
 def cmd_config_get(parameter, database, context):
     config = context.get("config", {})
 
@@ -251,7 +234,6 @@ def cmd_config_get(parameter, database, context):
         return RESPArray(["dbfilename", config.dbfilename])
     else:
         return RESPArray([])
-
 
 def cmd_keys(args, database, context):
     if len(args) != 1:
@@ -284,7 +266,6 @@ def cmd_keys(args, database, context):
     
     return RESPArray(keys)
 
-
 def cmd_subscribe(args, database, context):
     if len(args) < 1:
         return error("wrong number of arguments")
@@ -308,7 +289,6 @@ def cmd_subscribe(args, database, context):
 
     return RESPArray(responses)
 
-
 def cmd_publish(args, database, context):
     if len(args) != 2:
         return error("wrong number of arguments")
@@ -318,7 +298,6 @@ def cmd_publish(args, database, context):
 
     count = database.publish(channel, message)
     return RESPInteger(count)
-
 
 def cmd_unsubscribe(args, database, context):
     if len(args) < 1:
@@ -339,12 +318,10 @@ def cmd_unsubscribe(args, database, context):
         RESPInteger(len(context["subscribed_channels"]))
     ])
 
-
 def cmd_quit(args, database, context):
     if len(args) != 0:
         return error("wrong number of arguments")
     return ok()
-
 
 def cmd_zadd(args, database, context):
     if len(args) < 3 or len(args) % 2 != 1:
@@ -367,7 +344,6 @@ def cmd_zadd(args, database, context):
     except TypeError:
         return wrongtype_error()
 
-
 def cmd_zrank(args, database, context):
     if len(args) != 2:
         return error("wrong number of arguments")
@@ -377,7 +353,6 @@ def cmd_zrank(args, database, context):
     result = database.zrank(key, member)
 
     return null_bulk_string() if result == None else RESPInteger(result)
-
 
 def cmd_zrange(args, database, context):
     if len(args) != 3:
@@ -390,14 +365,12 @@ def cmd_zrange(args, database, context):
 
     return RESPArray() if result == None else RESPArray(result)
 
-
 def cmd_zcard(args, database, context):
     if len(args) != 1:
         return error("wrong number of arguments")
 
     key = args[0]
     return RESPInteger(database.zcard(key))
-
 
 def cmd_zscore(args, database, context):
     if len(args) != 2:
@@ -408,6 +381,16 @@ def cmd_zscore(args, database, context):
     result = database.zscore(key, member)
 
     return null_bulk_string if result == None else RESPBulkString(result) 
+
+def cmd_zrem(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    key = args[0]
+    member = args[1]
+    result = database.zrem(key, member)
+
+    return RESPInteger(result)
 
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
@@ -438,4 +421,5 @@ COMMANDS = {
     "ZRANGE": cmd_zrange,
     "ZCARD": cmd_zcard,
     "ZSCORE": cmd_zscore,
+    "ZREM": cmd_zrem
 }
