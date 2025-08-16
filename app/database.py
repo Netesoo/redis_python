@@ -241,3 +241,22 @@ class Database:
                 if not self._subscriptions[channel]:
                     del self._subscriptions[channel]
     
+
+    def zadd(self, key: str, *score_members: tuple[float, str]) -> int:
+        with self._condition:
+            entry = self._store.get(key)
+            if entry and not isinstance(entry["value"], dict):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+            if not entry:
+                self._store[key] = {"value": {}}
+
+            added_count = 0
+            value_dict = self._store[key]["value"]
+
+            for score, member in score_members:
+                if member not in value_dict:
+                    added_count += 1
+                value_dict[member] = float(score)
+
+            return added_count

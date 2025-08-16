@@ -340,6 +340,34 @@ def cmd_unsubscribe(args, database, context):
     ])
 
 
+def cmd_quit(args, database, context):
+    if len(args) != 0:
+        return error("wrong number of arguments")
+    return ok()
+
+
+def cmd_zadd(args, database, context):
+    if len(args) < 3 or len(args) % 2 != 1:
+        return error("wrong number of arguments")
+
+    key = args[0]
+    score_members = []
+
+    try:
+        for i in range(1, len(args), 2):
+            score = float(args[i])
+            member = args[i + 1]
+            score_members.append((score, member))
+    except ValueError:
+        return error("score is not a valid float")
+
+    try:
+        result = database.zadd(key, *score_members)
+        return RESPInteger(result)
+    except TypeError:
+        return wrongtype_error()
+
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -362,5 +390,7 @@ COMMANDS = {
     "KEYS": cmd_keys,
     "SUBSCRIBE": cmd_subscribe,
     "PUBLISH": cmd_publish,
-    "UNSUBSCRIBE": cmd_unsubscribe
+    "QUIT": cmd_quit,
+    "UNSUBSCRIBE": cmd_unsubscribe,
+    "ZADD": cmd_zadd,
 }
