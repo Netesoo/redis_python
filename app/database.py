@@ -266,9 +266,26 @@ class Database:
                 return None
             if not isinstance(entry["value"], SortedSet):
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
-            
-            return entry["value"].get_rank(member)
 
+            return entry["value"].get_rank(member)
+    
+
+    def zrange(self, key: str, min_index: int, max_index: int) -> list | None:
+        with self._condition:
+            entry = self._store.get(key)
+            if not entry:
+                return None
+            if not isinstance(entry["value"], SortedSet):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+            if min_index >= len(entry["value"]):
+                return None
+            if min_index > max_index:
+                return None
+            if max_index > len(entry["value"]):
+                max_index = len(entry["value"])
+
+            return list()
 
 
 class SortedSet:
@@ -296,11 +313,3 @@ class SortedSet:
             return self._sorted_list.index(member)
         except ValueError:
             return None
-
-    def get_range(self, min_score, max_score):
-        result = []
-        for member in self._sorted_list:
-            score = self._members[member]
-            if min_score <= score <= max_score:
-                result.append((member, score))
-        return result
