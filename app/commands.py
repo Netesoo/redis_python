@@ -376,23 +376,19 @@ def cmd_zrank(args, database, context):
     member = args[1]
     result = database.zrank(key, member)
 
-    if result == None:
-        return null_bulk_string()
-    else: 
-        return RESPInteger(result)
+    return null_bulk_string() if result == None else RESPInteger(result)
 
 
 def cmd_zrange(args, database, context):
     if len(args) != 3:
         return error("wrong number of arguments")
+    
     key = args[0]
-    min_index = int(args[1])
-    max_index = int(args[2])
-    result = database.zrange(key, min_index, max_index)
-    if result == None:
-        return RESPArray()
-    else: 
-        return RESPArray(result)
+    start = int(args[1])
+    stop = int(args[2])
+    result = database.zrange(key, start, stop)
+
+    return RESPArray() if result == None else RESPArray(result)
 
 
 def _match_pattern(key, pattern):

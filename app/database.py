@@ -270,9 +270,10 @@ class Database:
             return entry["value"].get_rank(member)
     
 
-    def zrange(self, key: str, min_index: int, max_index: int) -> list | None:
+    def zrange(self, key: str, start: int, stop: int) -> list | None:
         with self._condition:
             entry = self._store.get(key)
+
             if not entry:
                 return None
             if not isinstance(entry["value"], SortedSet):
@@ -280,18 +281,31 @@ class Database:
 
             lst = entry["value"]._sorted_list
 
-            if min_index >= len(lst):
-                return None
-            if min_index > max_index:
-                return None
-            if max_index > len(lst):
-                max_index = len(lst) - 1
+            length = len(lst)
 
-            result = []
+            if length == 0:
+                return []
 
-            for i in range(min_index, max_index + 1):
-                result.append(lst[i])
-            return result
+            if start >= length:
+                return []
+
+            if stop >= length:
+                stop = length - 1
+
+            if start < 0:
+                start = length + start
+            if stop < 0:
+                stop = length + stop
+
+            if start < 0:
+                start = 0
+            if stop >= length:
+                stop = length - 1
+
+            if start > stop:
+                return []
+
+            return lst[start:stop + 1]
 
 
 class SortedSet:
