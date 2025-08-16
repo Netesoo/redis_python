@@ -391,6 +391,14 @@ def cmd_zrange(args, database, context):
     return RESPArray() if result == None else RESPArray(result)
 
 
+def cmd_zcard(args, database, context):
+    if len(args) != 1:
+        return error("wrong number of arguments")
+
+    key = args[0]
+    return database.zcard(key)
+
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -418,4 +426,5 @@ COMMANDS = {
     "ZADD": cmd_zadd,
     "ZRANK": cmd_zrank,
     "ZRANGE": cmd_zrange,
+    "ZCARD": cmd_zcard,
 }

@@ -308,6 +308,18 @@ class Database:
             return lst[start:stop + 1]
 
 
+    def zcard(self) -> int:
+        with self._condition:
+            entry = self._store.get(key)
+
+            if not entry:
+                return 0
+            if not isinstance(entry["value"], SortedSet):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+            return len(entry["value"]._sorted_list)
+
+
 class SortedSet:
     def __init__(self):
         self._members = {}
