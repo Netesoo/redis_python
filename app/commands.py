@@ -368,6 +368,20 @@ def cmd_zadd(args, database, context):
         return wrongtype_error()
 
 
+def cmd_zrank(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    key = args[0]
+    member = args[1]
+    result = database.zrank(key, member)
+
+    if result == None:
+        return null_bulk_string()
+    else: 
+        return RESPInteger(result)
+
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -393,4 +407,5 @@ COMMANDS = {
     "QUIT": cmd_quit,
     "UNSUBSCRIBE": cmd_unsubscribe,
     "ZADD": cmd_zadd,
+    "ZRANK": cmd_zrank,
 }

@@ -245,18 +245,62 @@ class Database:
     def zadd(self, key: str, *score_members: tuple[float, str]) -> int:
         with self._condition:
             entry = self._store.get(key)
-            if entry and not isinstance(entry["value"], dict):
+            if entry and not isinstance(entry["value"], SortedSet):
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
             if not entry:
-                self._store[key] = {"value": {}}
+                self._store[key] = {"value": SortedSet()}
 
             added_count = 0
-            value_dict = self._store[key]["value"]
+            sorted_set = self._store[key]["value"]
 
             for score, member in score_members:
-                if member not in value_dict:
-                    added_count += 1
-                value_dict[member] = float(score)
+                added_count += sorted_set.add(member, score)
 
             return added_count
+
+    def zrank(self, key: str, member: str) -> int | None:
+        with self._condition:
+            entry = self._store.get(key)
+            if not entry:
+                return None
+            if not isinstance(entry["value"], SortedSet):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            return entry["value"].get_rank(member)
+
+
+
+class SortedSet:
+    def __init__(self):
+        self._members = {}
+        self._sorted_list = []
+
+    def add(self, member, score):
+        added = member not in self._members  
+        self._members[member] = float(score) 
+        if added:
+            self._sorted_list.append(member)
+        else:
+            self._sorted_list.remove(member)
+            self._sorted_list.append(member)
+
+        self._sorted_list.sort(key=lambda x: (self._members[x], x))
+        return 1 if added else 0
+
+    def get_score(self, member):
+        return self._members.get(member)
+    
+    def get_rank(self, member):
+        try:
+            return self._sorted_list.index(member)
+        except ValueError:
+            return None
+
+    def get_range(self, min_score, max_score):
+        result = []
+        for member in self._sorted_list:
+            score = self._members[member]
+            if min_score <= score <= max_score:
+                result.append((member, score))
+        return result
