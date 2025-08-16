@@ -259,6 +259,7 @@ class Database:
 
             return added_count
 
+
     def zrank(self, key: str, member: str) -> int | None:
         with self._condition:
             entry = self._store.get(key)
@@ -318,6 +319,18 @@ class Database:
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
             return len(entry["value"]._sorted_list)
+
+
+    def zscore(self, key: str, member: str) -> str | None:
+        with self._condition:
+            entry = self._store.get(key)
+
+            if not entry:
+                return None
+            if not isinstance(entry["value"], SortedSet):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+        return str(entry["value"].get_score(member))
 
 
 class SortedSet:

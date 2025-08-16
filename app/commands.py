@@ -399,6 +399,16 @@ def cmd_zcard(args, database, context):
     return RESPInteger(database.zcard(key))
 
 
+def cmd_zscore(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    key = args[0]
+    member = args[1]
+    result = database.zscore(key, member)
+
+    return null_bulk_string if result == None else RESPBulkString(result) 
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -427,4 +437,5 @@ COMMANDS = {
     "ZRANK": cmd_zrank,
     "ZRANGE": cmd_zrange,
     "ZCARD": cmd_zcard,
+    "ZSCORE": cmd_zscore,
 }
