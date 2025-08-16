@@ -382,20 +382,17 @@ def cmd_zrank(args, database, context):
         return RESPInteger(result)
 
 
-    def cmd_zrange(args, database, context):
-        if len(args) != 3:
-            return error("wrong number of arguments")
-
-        key = args[0]
-        min_index = args[1]
-        max_index = args[2]
-
-        result = database.zrange(key, min_index, max_index)
-
-        if result == None:
-            return RESPArray()
-        else: 
-            return RESPArray(result)
+def cmd_zrange(args, database, context):
+    if len(args) != 3:
+        return error("wrong number of arguments")
+    key = args[0]
+    min_index = int(args[1])
+    max_index = int(args[2])
+    result = database.zrange(key, min_index, max_index)
+    if result == None:
+        return RESPArray()
+    else: 
+        return RESPArray(result)
 
 
 def _match_pattern(key, pattern):

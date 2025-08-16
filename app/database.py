@@ -278,14 +278,20 @@ class Database:
             if not isinstance(entry["value"], SortedSet):
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
-            if min_index >= len(entry["value"]):
+            lst = entry["value"]._sorted_list
+
+            if min_index >= len(lst):
                 return None
             if min_index > max_index:
                 return None
-            if max_index > len(entry["value"]):
-                max_index = len(entry["value"])
+            if max_index > len(lst):
+                max_index = len(lst) - 1
 
-            return list()
+            result = []
+
+            for i in range(min_index, max_index + 1):
+                result.append(lst[i])
+            return result
 
 
 class SortedSet:
@@ -313,3 +319,6 @@ class SortedSet:
             return self._sorted_list.index(member)
         except ValueError:
             return None
+
+    def __len__(self):
+        return len(self._sorted_list)
