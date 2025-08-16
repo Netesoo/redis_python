@@ -396,7 +396,7 @@ def cmd_zcard(args, database, context):
         return error("wrong number of arguments")
 
     key = args[0]
-    return database.zcard(key)
+    return RESPInteger(database.zcard(key))
 
 
 def _match_pattern(key, pattern):

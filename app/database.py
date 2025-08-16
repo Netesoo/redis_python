@@ -308,7 +308,7 @@ class Database:
             return lst[start:stop + 1]
 
 
-    def zcard(self) -> int:
+    def zcard(self, key: str) -> int:
         with self._condition:
             entry = self._store.get(key)
 
