@@ -340,7 +340,9 @@ class Database:
         
             stream = self._store[key]["value"]
             result = stream.add(stream_id, *fields_values)
-            self._condition.notify()
+            
+            self._condition.notify_all()
+            
             return result
 
     def xrange(self, key: str, start: str, end: str) -> list:
@@ -356,60 +358,54 @@ class Database:
             return stream.get_range(start, end)
 
     def xread(self, streams_and_ids: list, block: int = None) -> list:
+        resolved_streams_and_ids = []
+        for stream_key, last_id in streams_and_ids:
+            if last_id == "$":
+                entry = self._store.get(stream_key)
+                if entry and isinstance(entry["value"], Stream) and entry["value"]._entries:
+                    actual_last_id = entry["value"]._entries[-1][0]
+                    resolved_streams_and_ids.append((stream_key, actual_last_id))
+                else:
+                    resolved_streams_and_ids.append((stream_key, "0-0"))
+            else:
+                resolved_streams_and_ids.append((stream_key, last_id))
+        
         if block is not None:
             end_time = time.time() + (block / 1000.0) if block > 0 else None
         
-        with self._condition:
-            while True:
-                result = self._read_streams_nonblocking(streams_and_ids)
-                if result:
-                    return result
-                
-                if block > 0:
-                    remaining = end_time - time.time()
-                    if remaining <= 0:
-                        return []
-                    self._condition.wait(timeout=remaining)
-                else:
-                    self._condition.wait()
-            else:
-                return self._read_streams_nonblocking(streams_and_ids)
+            with self._condition:
+                while True:
+                    result = self._read_streams_nonblocking(resolved_streams_and_ids)
+                    if result:
+                        return result
+
+                    if block > 0:
+                        remaining = end_time - time.time()
+                        if remaining <= 0:
+                            return []
+                        self._condition.wait(timeout=remaining)
+                    else:
+                        self._condition.wait()
+        else:
+            return self._read_streams_nonblocking(resolved_streams_and_ids)
 
     def _read_streams_nonblocking(self, streams_and_ids: list) -> list:
-        """
-        Helper function to read from streams without blocking
-        """
         result = []
 
         for stream_key, last_id in streams_and_ids:
-
             with self._condition:
                 entry = self._store.get(stream_key)
                 if not entry:
                     continue
-
 
                 if not isinstance(entry["value"], Stream):
                     raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
                 stream = entry["value"]
                 entries = []
-
-                if last_id == "$":
-                    # $ means start from the latest entry in the stream
-                    # For XREAD, this means we want entries AFTER the latest
-                    if stream._entries:
-                        last_entry_id = stream._entries[-1][0]
-                        last_id = last_entry_id
-                    else:
-                        # Empty stream, no entries to return
-                        continue
-
-                # Get all entries after last_id
                 for entry_id, fields in stream._entries:
                     comparison = self._compare_stream_ids(entry_id, last_id)
                     if comparison > 0:
-                        # Convert fields dict to flat list
                         field_list = []
                         for key, value in fields.items():
                             field_list.extend([key, value])
