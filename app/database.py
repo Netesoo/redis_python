@@ -386,7 +386,7 @@ class Stream:
         if len(fields_values) % 2 != 0:
             raise ValueError("wrong number of arguments for field-value pairs")
             
-        if id == "*":
+        if stream_id == "*":
             current_ms = current_millis()
             seq = 0
             if self._entries:
@@ -401,15 +401,20 @@ class Stream:
             try:
                 ms, seq = map(int, stream_id.split("-"))
                 if ms < 0 or seq < 0:
-                    raise ValueError
+                    raise ValueError("The ID specified in xADD can not have negative timestamp or sequence")
+                if ms == 0 and seq == 0:
+                    raise ValueError("The ID specified in XADD must be greater than 0-0")
                 if self._entries:
                     last_id = self._entries[-1][0]
                     last_ms, last_seq = map(int, last_id.split("-"))
                     if ms < last_ms or (ms == last_ms and seq <= last_seq):
-                        raise ValueError("invalid ID: must be greater than the last ID")
+                        raise ValueError("The ID specified in XADD is equal or smaller than the target stream top item")
+                
                 new_id = stream_id
-            except ValueError:
-                raise ValueError("invalid ID format or value")
+            except ValueError as e:
+                if str(e).startswith("The ID"):
+                    raise
+                raise ValueError("invalid ID format")
 
         entry_dict= {}
         for i in range(0, len(fields_values), 2):
