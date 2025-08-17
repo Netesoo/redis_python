@@ -397,6 +397,26 @@ class Stream:
                 elif last_ms > current_ms:
                     raise ValueError("invalid ID: timestamp is in the past")
             new_id = f"{current_ms}-{seq}"
+        elif stream_id.endswith("-*"):
+            try:
+                ms = int(stream_id[:-2])
+                if ms < 0:
+                    raise ValueError("The ID specified in xADD can not have negative timestamp")
+                seq = 0
+                if self._entries:
+                    last_id = self._entries[-1][0]
+                    last_ms, last_seq = map(int, last_id.split("-"))
+                    if ms < last_ms:
+                        raise ValueError("The ID specified in XADD is equal or smaller than the target stream top item")
+                    elif ms == last_ms:
+                        seq = last_seq + 1
+                elif ms == 0:
+                    seq = 1
+                new_id = f"{ms}-{seq}"
+            except ValueError as e:
+                if str(e).startswith("The ID"):
+                    raise
+                raise ValueError("invalid ID format")
         else:
             try:
                 ms, seq = map(int, stream_id.split("-"))
