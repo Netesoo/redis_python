@@ -438,12 +438,101 @@ def cmd_xrange(args, database, context):
 
     try:
         result = database.xrange(key, start, end)
-        return RESPArray([RESPArray([RESPBulkString(entry_id), RESPArray(fields)]) for entry_id, fields in result])
+        return RESPArray([
+            RESPArray([RESPBulkString(entry_id), RESPArray(fields)
+            ]) for entry_id, fields in result])
     except TypeError as e:
         print(f"TypeError in cmd_xrange: {e}")
         return wrongtype_error()
     except ValueError as e:
         print(f"ValueError in cmd_xrange: {e}")
+        return error(str(e))
+
+def cmd_xread(args, database, context):
+    if len(args) < 3:
+        return error("wrong number of arguments")
+    
+    count = None
+    block = None
+    i = 0
+    
+    # Parse optional arguments
+    while i < len(args):
+        if args[i].upper() == "COUNT":
+            if i + 1 >= len(args):
+                return error("wrong number of arguments")
+            try:
+                count = int(args[i + 1])
+                if count <= 0:
+                    return error("COUNT must be > 0")
+                i += 2
+            except ValueError:
+                return error("COUNT must be an integer")
+        elif args[i].upper() == "BLOCK":
+            if i + 1 >= len(args):
+                return error("wrong number of arguments")
+            try:
+                block = int(args[i + 1])
+                if block < 0:
+                    return error("BLOCK timeout must be >= 0")
+                i += 2
+            except ValueError:
+                return error("BLOCK timeout must be an integer")
+        elif args[i].upper() == "STREAMS":
+            i += 1
+            break
+        else:
+            return error("syntax error")
+    
+    # Parse streams and IDs
+    if i >= len(args):
+        return error("wrong number of arguments")
+    
+    streams_part = args[i:]
+    
+    if len(streams_part) % 2 != 0:
+        return error("Unbalanced XREAD list of streams: for each stream key an ID or '$' must be specified.")
+    
+    num_streams = len(streams_part) // 2
+    stream_keys = streams_part[:num_streams]
+    stream_ids = streams_part[num_streams:]
+    
+    streams_and_ids = list(zip(stream_keys, stream_ids))
+    
+    try:
+        result = database.xread(streams_and_ids, block)
+        
+        if not result:
+            return null_bulk_string()
+        
+        # Format response as nested arrays
+        response_streams = []
+        for stream_key, entries in result:
+            formatted_entries = []
+            for entry_id, fields in entries:
+                if count is not None and len(formatted_entries) >= count:
+                    break
+                formatted_entries.append(RESPArray([
+                    RESPBulkString(entry_id),
+                    RESPArray([RESPBulkString(field) for field in fields])
+                ]))
+            
+            if formatted_entries:
+                response_streams.append(RESPArray([
+                    RESPBulkString(stream_key),
+                    RESPArray(formatted_entries)
+                ]))
+        
+        if not response_streams:
+            return null_bulk_string()
+            
+        return RESPArray(response_streams)
+        
+    except TypeError as e:
+        import traceback
+        traceback.print_exc()
+        return wrongtype_error()
+    except ValueError as e:
         return error(str(e))
 
 def _match_pattern(key, pattern):
@@ -479,4 +568,5 @@ COMMANDS = {
     "TYPE": cmd_type,
     "XADD": cmd_xadd,
     "XRANGE": cmd_xrange,
+    "XREAD": cmd_xread,
 }

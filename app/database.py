@@ -339,7 +339,9 @@ class Database:
                 self._store[key] = {"value": Stream()}
         
             stream = self._store[key]["value"]
-            return stream.add(stream_id, *fields_values)
+            result = stream.add(stream_id, *fields_values)
+            self._condition.notify()
+            return result
 
     def xrange(self, key: str, start: str, end: str) -> list:
         with self._condition:
@@ -352,6 +354,90 @@ class Database:
 
             stream = entry["value"]
             return stream.get_range(start, end)
+
+    def xread(self, streams_and_ids: list, block: int = None) -> list:
+        if block is not None:
+            end_time = time.time() + (block / 1000.0) if block > 0 else None
+        
+        with self._condition:
+            while True:
+                result = self._read_streams_nonblocking(streams_and_ids)
+                if result:
+                    return result
+                
+                if block > 0:
+                    remaining = end_time - time.time()
+                    if remaining <= 0:
+                        return []
+                    self._condition.wait(timeout=remaining)
+                else:
+                    self._condition.wait()
+            else:
+                return self._read_streams_nonblocking(streams_and_ids)
+
+    def _read_streams_nonblocking(self, streams_and_ids: list) -> list:
+        """
+        Helper function to read from streams without blocking
+        """
+        result = []
+
+        for stream_key, last_id in streams_and_ids:
+
+            with self._condition:
+                entry = self._store.get(stream_key)
+                if not entry:
+                    continue
+
+
+                if not isinstance(entry["value"], Stream):
+                    raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+                stream = entry["value"]
+                entries = []
+
+                if last_id == "$":
+                    # $ means start from the latest entry in the stream
+                    # For XREAD, this means we want entries AFTER the latest
+                    if stream._entries:
+                        last_entry_id = stream._entries[-1][0]
+                        last_id = last_entry_id
+                    else:
+                        # Empty stream, no entries to return
+                        continue
+
+                # Get all entries after last_id
+                for entry_id, fields in stream._entries:
+                    comparison = self._compare_stream_ids(entry_id, last_id)
+                    if comparison > 0:
+                        # Convert fields dict to flat list
+                        field_list = []
+                        for key, value in fields.items():
+                            field_list.extend([key, value])
+                        entries.append([entry_id, field_list])
+
+                if entries:
+                    result.append([stream_key, entries])
+
+        return result
+
+    def _compare_stream_ids(self, id1: str, id2: str) -> int:
+        try:
+            ms1, seq1 = map(int, id1.split("-"))
+            ms2, seq2 = map(int, id2.split("-"))
+            
+            if ms1 < ms2:
+                return -1
+            elif ms1 > ms2:
+                return 1
+            else:
+                if seq1 < seq2:
+                    return -1
+                elif seq1 > seq2:
+                    return 1
+                else:
+                    return 0
+        except ValueError:
+            raise ValueError("Invalid stream ID format")
 
 class SortedSet:
     def __init__(self):
