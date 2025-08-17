@@ -5,6 +5,7 @@ from app.resp import (
     RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray,
     ok, pong, error, wrongtype_error, null_bulk_string
 )
+from app.database import Stream
 
 def handle_command(command, args, database, context):
     if context.get("in_subscription") and command.upper() not in ("SUBSCRIBE", "UNSUBSCRIBE", "PING", "QUIT", "RESET"):
@@ -406,11 +407,27 @@ def cmd_type(args, database, context):
         return RESPSimpleString("list")
     elif type(result) == set:
         return RESPSimpleString("set")
-#    elif result == stream:
-#        return RESPSimpleString("stream")
+    elif type(result) == Stream:
+        return RESPSimpleString("stream")
     else:
         return RESPSimpleString("none")
 
+def cmd_xadd(args, database, context):
+    if len(args) < 3 or len(args) % 2 != 0:
+        return error("wrong number of arguments")
+    
+    key = args[0]
+    stream_id = args[1]
+    fields_values = args[2:]
+    
+    try:
+        result = database.xadd(key, stream_id, *fields_values)
+        return RESPBulkString(result)
+    except TypeError:
+        return wrongtype_error()
+    except ValueError as e:
+        return error(str(e))
+    
 
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
@@ -443,4 +460,5 @@ COMMANDS = {
     "ZSCORE": cmd_zscore,
     "ZREM": cmd_zrem,
     "TYPE": cmd_type,
+    "XADD": cmd_xadd,
 }

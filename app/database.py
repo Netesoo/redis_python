@@ -329,6 +329,20 @@ class Database:
                 return None
             return entry["value"]
 
+    def xadd(self, key: str, stream_id: str, *fields_values: str) -> str:
+        with self._condition:
+            entry = self._store.get(key)
+            if entry and not isinstance(entry["value"], Stream):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            if not entry:
+                self._store[key] = {"value": Stream()}
+        
+            stream = self._store[key]["value"]
+            return stream.add(stream_id, *fields_values)
+
+           
+
 class SortedSet:
     def __init__(self):
         self._members = {}
@@ -363,3 +377,44 @@ class SortedSet:
 
     def __len__(self):
         return len(self._sorted_list)
+
+class Stream:
+    def __init__(self):
+        self._entries = []
+    
+    def add(self, stream_id: str, *fields_values: str) -> str:
+        if len(fields_values) % 2 != 0:
+            raise ValueError("wrong number of arguments for field-value pairs")
+            
+        if id == "*":
+            current_ms = current_millis()
+            seq = 0
+            if self._entries:
+                last_id = self._entries[-1][0]
+                last_ms, last_seq = map(int, last_id.split("-"))
+                if last_ms == current_ms:
+                    seq = last_seq + 1
+                elif last_ms > current_ms:
+                    raise ValueError("invalid ID: timestamp is in the past")
+            new_id = f"{current_ms}-{seq}"
+        else:
+            try:
+                ms, seq = map(int, stream_id.split("-"))
+                if ms < 0 or seq < 0:
+                    raise ValueError
+                if self._entries:
+                    last_id = self._entries[-1][0]
+                    last_ms, last_seq = map(int, last_id.split("-"))
+                    if ms < last_ms or (ms == last_ms and seq <= last_seq):
+                        raise ValueError("invalid ID: must be greater than the last ID")
+                new_id = stream_id
+            except ValueError:
+                raise ValueError("invalid ID format or value")
+
+        entry_dict= {}
+        for i in range(0, len(fields_values), 2):
+            entry_dict[fields_values[i]] = fields_values[i + 1]
+
+        self._entries.append((new_id, entry_dict))
+
+        return new_id 
