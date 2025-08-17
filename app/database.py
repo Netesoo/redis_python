@@ -341,7 +341,17 @@ class Database:
             stream = self._store[key]["value"]
             return stream.add(stream_id, *fields_values)
 
-           
+    def xrange(self, key: str, start: str, end: str) -> list:
+        with self._condition:
+            entry = self._store.get(key)
+
+            if not entry:
+                return []
+            if entry and not isinstance(entry["value"], Stream):
+                raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+            stream = entry["value"]
+            return stream.get_range(start, end)
 
 class SortedSet:
     def __init__(self):
@@ -401,7 +411,7 @@ class Stream:
             try:
                 ms = int(stream_id[:-2])
                 if ms < 0:
-                    raise ValueError("The ID specified in xADD can not have negative timestamp")
+                    raise ValueError("The ID specified in XADD can not have negative timestamp")
                 seq = 0
                 if self._entries:
                     last_id = self._entries[-1][0]
@@ -421,7 +431,7 @@ class Stream:
             try:
                 ms, seq = map(int, stream_id.split("-"))
                 if ms < 0 or seq < 0:
-                    raise ValueError("The ID specified in xADD can not have negative timestamp or sequence")
+                    raise ValueError("The ID specified in XADD can not have negative timestamp or sequence")
                 if ms == 0 and seq == 0:
                     raise ValueError("The ID specified in XADD must be greater than 0-0")
                 if self._entries:
@@ -443,3 +453,33 @@ class Stream:
         self._entries.append((new_id, entry_dict))
 
         return new_id 
+
+    def get_range(self, start: str, end: str) -> list:
+        if start == "-":
+            start_ms, start_seq = 0, 0
+        else:
+            try:
+                start_ms, start_seq = map(int, start.split("-"))
+                if start_ms < 0 or start_seq < 0:
+                    raise ValueError("The ID specified in XRANGE can not have negative timestamp or sequence")
+            except ValueError:
+                raise ValueError("invalid end ID format")
+
+        if end == "+":
+            end_ms, end_seq = float("inf"), float("inf")
+        else:
+            try:
+                end_ms, end_seq = map(int, end.split("-"))
+                if end_ms < 0 or end_seq < 0:
+                    raise ValueError("The ID specified in XRANGE can not have negative timestamp or sequence")
+            except ValueError:
+                raise ValueError("invalid end ID format")
+
+        result = []
+        for entry_id, fields in self._entries:
+            ms, seq = map(int, entry_id.split("-"))
+            if (start_ms < ms or (start_ms == ms and start_seq <= seq)) and \
+               (end_ms > ms or (end_ms == ms and end_seq >= seq)):
+                result.append((entry_id, list(sum(fields.items(), ()))))
+        
+        return result

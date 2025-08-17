@@ -428,6 +428,23 @@ def cmd_xadd(args, database, context):
     except ValueError as e:
         return error(str(e))
     
+def cmd_xrange(args, database, context):
+    if len(args) != 3:
+        return error("wrong number of arguments")
+    
+    key = args[0]
+    start = args[1]
+    end = args[2]
+
+    try:
+        result = database.xrange(key, start, end)
+        return RESPArray([RESPArray([RESPBulkString(entry_id), RESPArray(fields)]) for entry_id, fields in result])
+    except TypeError as e:
+        print(f"TypeError in cmd_xrange: {e}")
+        return wrongtype_error()
+    except ValueError as e:
+        print(f"ValueError in cmd_xrange: {e}")
+        return error(str(e))
 
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
@@ -461,4 +478,5 @@ COMMANDS = {
     "ZREM": cmd_zrem,
     "TYPE": cmd_type,
     "XADD": cmd_xadd,
+    "XRANGE": cmd_xrange,
 }
