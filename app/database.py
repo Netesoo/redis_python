@@ -319,7 +319,15 @@ class Database:
             if not isinstance(entry["value"], SortedSet):
                 raise TypeError("WRONGTYPE Operation against a key holding the wrong kind of value")
 
-        return entry["value"].delete(member)
+            return entry["value"].delete(member)
+
+    def _type(self, key: str) -> Any | None:
+        with self._condition:
+            entry = self._store.get(key)
+            
+            if not entry:
+                return None
+            return entry["value"]
 
 class SortedSet:
     def __init__(self):
@@ -352,6 +360,6 @@ class SortedSet:
             self._sorted_list.remove(member)
             return 1
         return 0
-        
+
     def __len__(self):
         return len(self._sorted_list)

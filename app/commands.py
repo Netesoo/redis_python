@@ -392,6 +392,26 @@ def cmd_zrem(args, database, context):
 
     return RESPInteger(result)
 
+def cmd_type(args, database, context):
+    if len(args) != 1:
+        return error("wrong number of arguments")
+
+    key = args[0]
+
+    result = database._type(key)
+
+    if type(result) == str:
+        return RESPSimpleString("string")
+    elif type(result) == list:
+        return RESPSimpleString("list")
+    elif type(result) == set:
+        return RESPSimpleString("set")
+#    elif result == stream:
+#        return RESPSimpleString("stream")
+    else:
+        return RESPSimpleString("none")
+
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -421,5 +441,6 @@ COMMANDS = {
     "ZRANGE": cmd_zrange,
     "ZCARD": cmd_zcard,
     "ZSCORE": cmd_zscore,
-    "ZREM": cmd_zrem
+    "ZREM": cmd_zrem,
+    "TYPE": cmd_type,
 }
