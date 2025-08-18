@@ -622,6 +622,16 @@ def cmd_psync(args, database, context):
             database.add_replica(replica_host, replica_port, client_socket)
         
         fullresync_response = f"FULLRESYNC {master_replid} {master_offset}"
+
+        if client_socket:
+            client_socket.sendall(RESPSimpleString(fullresync_response).encode())
+
+            empty_rdb = bytes.fromhex("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
+            rdb_bulk_string = f"${len(empty_rdb)}\r\n".encode() + empty_rdb
+            client_socket.sendall(rdb_bulk_string)
+
+            return None
+            
         return RESPSimpleString(fullresync_response)
     else:
         return error("unsupported PSYNC parametres")

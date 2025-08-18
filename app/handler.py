@@ -20,13 +20,15 @@ def handle_parsed_value(resp_value: RESPValue, database, context):
 
 def handle_client(client, database, config=None):
     buffer = b""
+    client_addr = client.getpeername()
     context = {
         "in_transaction": False,
         "transaction_queue": [],
         "in_subscription": False,
         "subscribed_channels": set(),
         "config": config or {},
-        "client_socket": client
+        "client_socket": client,
+        "client_addr": client_addr
     }
 
     while data := client.recv(1024):
@@ -90,7 +92,7 @@ def perform_handshake(master_host, master_port, config):
             RESPBulkString("-1")
         ])
         master_socket.sendall(psync_command.encode())
-        
+
         response = master_socket.recv(1024)
         print(f"Master response to PSYNC: {response}")
 
