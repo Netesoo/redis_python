@@ -64,5 +64,25 @@ def perform_handshake(master_host, master_port, config):
         response = master_socket.recv(1024)
         print(f"Master response to PING: {response}")
 
+        replconf_port = RESPArray([
+            RESPBulkString("REPLCONF"),
+            RESPBulkString("listening-port"),
+            RESPBulkString(str(config.port))
+        ])
+        master_socket.sendall(replconf_port.encode())
+
+        response = master_socket.recv(1024)
+        print(f"Master response to REPLCONF listenig-port: {response}")
+
+        replconf_capa = RESPArray([
+            RESPBulkString("REPLCONF"),
+            RESPBulkString("capa"),
+            RESPBulkString("psync2")
+        ])
+        master_socket.sendall(replconf_capa.encode())
+
+        response = master_socket.recv(1024)
+        print(f"Master response to REPLCONF capa: {response}")
+
     except Exception as e:
         print(f"Handshake error: {e}")
