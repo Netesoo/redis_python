@@ -84,5 +84,16 @@ def perform_handshake(master_host, master_port, config):
         response = master_socket.recv(1024)
         print(f"Master response to REPLCONF capa: {response}")
 
+        psync_command = RESPArray([
+            RESPBulkString("PSYNC"),
+            RESPBulkString("?"),
+            RESPBulkString("-1")
+        ])
+        master_socket.sendall(psync_command.encode())
+        
+        response = master_socket.recv(1024)
+        print(f"Master response to PSYNC: {response}")
+
+
     except Exception as e:
         print(f"Handshake error: {e}")
