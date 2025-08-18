@@ -444,7 +444,7 @@ class Database:
             "host": host,
             "port": port,
             "socket": socket,
-            "offest": 0
+            "offset": 0
         }
         self._replicas.append(replica)
 

@@ -17,7 +17,7 @@ def main():
     if config.replicaof:
         host, port = config.replicaof.split(" ")
         print(f"Starting as replica of {host}:{port}")
-        threading.Thread(target=perform_handshake, args=(host, int(port), config)).start()
+        threading.Thread(target=perform_handshake, args=(host, int(port), config, database)).start()
     else:
         print("Starting as master")
     

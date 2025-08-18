@@ -25,33 +25,37 @@ def handle_command(command, args, database, context):
         return RESPSimpleString("QUEUED").encode()
 
     response = func(args, database, context)
-
+    
     config = context.get("config", {})
     is_replica = context.get("is_replica", False)
-
+    
+    
     if not config.replicaof and not is_replica and command.upper() in WRITE_COMMANDS:
+        print(f"[REPLICATION] This is master, replicating {command}")
         replicate_command(command, args, database)
-
+    else:
+        print(f"[REPLICATION] Not replicating: master={not config.replicaof}, replica_cmd={is_replica}")
+    
     return response.encode() if hasattr(response, 'encode') else response
 
 def replicate_command(command, args, database):
     replicas = database.get_connected_replicas()
-
+    
     if not replicas:
+        print("[REPLICATION] No replicas connected")
         return
-
-    response = RESPArray([
-        RESPBulkString(command)
-    ] + [
-        RESPBulkString(str(arg)) for arg in args
-    ]).encode()
-
-    for replica in replicas[:]:
+    
+    resp_array = RESPArray([RESPBulkString(command)] + [RESPBulkString(str(arg)) for arg in args])
+    command_bytes = resp_array.encode()
+    
+    print(f"[REPLICATION] Command bytes to send: {command_bytes}")
+    
+    for replica in replicas[:]:  
         try:
-            replica["socket"].sendall(response)
-            print(f"Replicated {command} to replica at {replica['host']}:{replica['port']}")
+            replica["socket"].sendall(command_bytes)
+            print(f"[REPLICATION] Successfully sent {command} to replica at {replica['host']}:{replica['port']}")
         except Exception as e:
-            print(f"Failed to replicate to replica {replica['host']}:{replica['port']}: {e}")
+            print(f"[REPLICATION] Failed to send to replica {replica['host']}:{replica['port']}: {e}")
             database.remove_replica(replica["socket"])
 
 def cmd_echo(args, database, context):
@@ -81,6 +85,7 @@ def cmd_set(args, database, context):
             return error("PX value must be an integer")
 
     database.set(key, value, px=px)
+    
     return ok()
 
 def cmd_get(args, database, context):
@@ -88,6 +93,7 @@ def cmd_get(args, database, context):
         return error("wrong number of arguments")
     
     value = database.get(args[0])
+
     if value is None:
         return null_bulk_string()
     
@@ -288,8 +294,7 @@ def cmd_keys(args, database, context):
                 continue
             
             print(f"Testing fnmatch.fnmatch('{key}', '{pattern}')")
-            match_result = fnmatch.fnmatch(key, pattern)  # Note: key first, pattern second
-            print(f"Match result: {match_result}")
+            match_result = fnmatch.fnmatch(key, pattern)
             
             if match_result:
                 print(f"Key {key} matches pattern {pattern}")
@@ -488,7 +493,6 @@ def cmd_xread(args, database, context):
     block = None
     i = 0
     
-    # Parse optional arguments
     while i < len(args):
         if args[i].upper() == "COUNT":
             if i + 1 >= len(args):
@@ -516,7 +520,6 @@ def cmd_xread(args, database, context):
         else:
             return error("syntax error")
     
-    # Parse streams and IDs
     if i >= len(args):
         return error("wrong number of arguments")
     
@@ -537,7 +540,6 @@ def cmd_xread(args, database, context):
         if not result:
             return null_bulk_string()
         
-        # Format response as nested arrays
         response_streams = []
         for stream_key, entries in result:
             formatted_entries = []
@@ -639,34 +641,47 @@ def cmd_replconf(args, database, context):
 def cmd_psync(args, database, context):
     if len(args) != 2:
         return error("wrong number of arguments")
-
+    
     replication_id = args[0]
     offset = args[1]
-
+    
+    print(f"[PSYNC] Received PSYNC {replication_id} {offset}")
+    
     if replication_id == "?" and offset == "-1":
         master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
         master_offset = 0
-
+        
         client_socket = context.get("client_socket")
         if client_socket:
-            replica_host = context.get("client_addr", ["unknown"])[0] 
-            replica_port = context.get("replica_port", "unknown")
-            database.add_replica(replica_host, replica_port, client_socket)
+            try:
+                client_addr = client_socket.getpeername()
+                replica_host = client_addr[0]
+                replica_port = context.get("replica_port", "unknown")
+                database.add_replica(replica_host, replica_port, client_socket)
+                print(f"[PSYNC] Added replica {replica_host}:{replica_port} to database")
+            except Exception as e:
+                print(f"[PSYNC] Error adding replica: {e}")
         
         fullresync_response = f"FULLRESYNC {master_replid} {master_offset}"
-
+        print(f"[PSYNC] Sending: {fullresync_response}")
+        
         if client_socket:
-            client_socket.sendall(RESPSimpleString(fullresync_response).encode())
-
-            empty_rdb = bytes.fromhex("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
-            rdb_bulk_string = f"${len(empty_rdb)}\r\n".encode() + empty_rdb
-            client_socket.sendall(rdb_bulk_string)
-
-            return None
-
+            try:
+                client_socket.sendall(RESPSimpleString(fullresync_response).encode())
+                
+                empty_rdb = bytes.fromhex("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
+                rdb_bulk_string = f"${len(empty_rdb)}\r\n".encode() + empty_rdb
+                client_socket.sendall(rdb_bulk_string)
+                
+                print(f"[PSYNC] Sent RDB dump ({len(empty_rdb)} bytes) to replica")
+                
+                return None
+            except Exception as e:
+                print(f"[PSYNC] Error sending RDB: {e}")
+        
         return RESPSimpleString(fullresync_response)
     else:
-        return error("unsupported PSYNC parametres")
+        return error("unsupported PSYNC parameters")
 
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
