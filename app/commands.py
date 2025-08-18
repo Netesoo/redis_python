@@ -584,6 +584,48 @@ def cmd_info(args, database, context):
     else:
         return RESPBulkString("")
 
+def cmd_replconf(args, database, context):
+    if len(args) < 2:
+        return error("wrong number of arguments")
+
+    subcommand = args[0].upper()
+
+    if subcommand == "LISTENING-PORT":
+        port = args[1]
+        context["replica_port"] = port
+        return ok()
+    elif subcommand == "CAPA":
+        capability = args[1].upper()
+        if capability == "PSYNC2":
+            context["replica_capabilities"] = ["psync2"]
+            return ok()
+        else:
+            return error(f"unsupported capability: {capability}")
+    else:
+        return error(f"unknown REPLCONF subcommand: {subcommand}")
+
+def cmd_psync(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    replication_id = args[0]
+    offset = args[1]
+
+    if replication_id == "?" and offest == "-1":
+        master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
+        master_offset = 0
+
+        client_socket = context.get("client_socket")
+        if client_socket:
+            replica_host = context.get("client_addr", ["unknown"])[0] 
+            replica_port = context.get("replica_port", "unknown")
+            database.add_replica(replica_host, replica_port, client_socket)
+        
+        fullresync_response = f"FULLRESYNC {master_replid} {master_offset}"
+        return RESPSimpleString(fullresync_response)
+    else:
+        return error("unsupported PSYNC parametres")
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -619,4 +661,6 @@ COMMANDS = {
     "XRANGE": cmd_xrange,
     "XREAD": cmd_xread,
     "INFO": cmd_info,
+    "REPLCONF": cmd_replconf,
+    "PSYNC": cmd_psync,
 }
