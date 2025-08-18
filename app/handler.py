@@ -1,6 +1,7 @@
 import socket
 from app.commands import handle_command
 from app.resp import RESPType, RESPValue, parse_resp_with_offset, error, RESPArray, RESPBulkString
+from app.database import Database
 
 def handle_parsed_value(resp_value: RESPValue, database, context):
     if resp_value.type != RESPType.ARRAY:
@@ -96,6 +97,54 @@ def perform_handshake(master_host, master_port, config):
         response = master_socket.recv(1024)
         print(f"Master response to PSYNC: {response}")
 
+        listen_to_master(master_socket, config)
 
     except Exception as e:
         print(f"Handshake error: {e}")
+
+def listen_to_master(master_socket, config):
+    buffer = b""
+    database = Database()
+
+    while True:
+        try:
+            data = master_socket.recv(1024)
+            if not data:
+                print("Master connection closed")
+                break
+                
+            buffer += data
+            offset = 0
+            
+            while offset < len(buffer):
+                try:
+                    value, offset = parse_resp_with_offset(buffer, offset)
+                    if value.type == RESPType.ARRAY and value.value:
+                        command = value.value[0].value.upper()
+                        args = [item.value for item in value.value[1:]]
+                        
+                        print(f"Replica received command: {command} {args}")
+                        
+                        context = {"config": config, "is_replica": True}
+                        handle_replica_command(command, args, database, context)
+                        
+                except Exception as e:
+                    print(f"Error parsing replica command: {e}")
+                    break
+            
+            buffer = buffer[offset:]
+            
+        except Exception as e:
+            print(f"Error listening to master: {e}")
+            break
+    
+    master_socket.close()
+
+def handle_replica_command(command, args, database, context):
+    func = COMMANDS.get(command.upper())
+    if func:
+        try:
+            response = func(args, database, context)
+            print(f"Replica executed: {command} -> {response}")
+        except Exception as e:
+            print(f"Error executing replica command {command}: {e}")

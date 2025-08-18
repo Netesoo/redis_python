@@ -7,6 +7,11 @@ from app.resp import (
 )
 from app.database import Stream
 
+WRITE_COMMANDS = {
+    "SET", "DEL", "INCR", "LPUSH", "RPUSH", "LPOP", "RPOP",
+    "ZADD", "ZREM", "XADD"
+}
+
 def handle_command(command, args, database, context):
     if context.get("in_subscription") and command.upper() not in ("SUBSCRIBE", "UNSUBSCRIBE", "PING", "QUIT", "RESET"):
         return error(f"Can't execute '{command}': only SUBSCRIBE, UNSUBSCRIBE, PING, QUIT, and RESET allowed in subscription mode").encode()
@@ -20,7 +25,34 @@ def handle_command(command, args, database, context):
         return RESPSimpleString("QUEUED").encode()
 
     response = func(args, database, context)
+
+    config = context.get("config", {})
+    is_replica = context.get("is_replica", False)
+
+    if not config.replicaof and not is_replica and command.upper() in WRITE_COMMANDS:
+        replicate_command(command, args, database)
+
     return response.encode() if hasattr(response, 'encode') else response
+
+def replicate_command(command, args, database):
+    replicas = database.get_connected_replicas()
+
+    if not replicas:
+        return
+
+    response = RESPArray([
+        RESPBulkString(command)
+    ] + [
+        RESPBulkString(str(arg)) for arg in args
+    ]).encode()
+
+    for replica in replicas[:]:
+        try:
+            replica["socket"].sendall(response)
+            print(f"Replicated {command} to replica at {replica['host']}:{replica['port']}")
+        except Exception as e:
+            print(f"Failed to replicate to replica {replica['host']}:{replica['port']}: {e}")
+            database.remove_replica(replica["socket"])
 
 def cmd_echo(args, database, context):
     if len(args) != 1:
@@ -631,7 +663,7 @@ def cmd_psync(args, database, context):
             client_socket.sendall(rdb_bulk_string)
 
             return None
-            
+
         return RESPSimpleString(fullresync_response)
     else:
         return error("unsupported PSYNC parametres")
