@@ -14,9 +14,15 @@ def main():
     config = parse_args()
     database = Database()
 
-    rdb_path = f"{config.dir}/{config.dbfilename}"
-    print(config.dbfilename)
-    database.load_rdb(rdb_path)
+    if config.replicaof:
+        print(f"Starting as replica of {config.replicaof}")
+    else:
+        print("Starting as master")
+    
+    if not config.replicaof and config.dir and config.dbfilename:
+        rdb_path = f"{config.dir}/{config.dbfilename}"
+        print(f"loading RDB from: {rdb_path}")
+        database.load_rdb(rdb_path)
 
     _gether(database, config)
 

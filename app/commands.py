@@ -535,6 +535,55 @@ def cmd_xread(args, database, context):
     except ValueError as e:
         return error(str(e))
 
+def cmd_info(args, database, context):
+    if len(args) > 1:
+        return error("wrong number of arguments")
+
+    section = args[0].lower() if args else "default"
+
+    if section in ("replication", "default"):
+        config = context.get("config", {})
+
+        is_replica = config.replicaof is not None
+
+        if is_replica:
+            master_host, master_port = config.replicaof.split(" ")
+            info_lines = [
+                "# Replication",
+                "role:slave",
+                f"master_host:{master_host}",
+                f"master_port:{master_port}",
+                "master_link_status:up",
+                "slave_repl_offset:0",
+                "slave_priority:100",
+                "slave_read_only:1"
+            ]
+        else:
+            connected_slaves = database.get_connected_replicas()
+
+            info_lines = [
+                "# Replication",
+                "role:master",
+                f"connected_slaves:{len(connected_slaves)}",
+                "master_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
+                "master_replid2:0000000000000000000000000000000000000000",
+                "master_repl_offset:0",
+                "second_repl_offset:-1",
+                "repl_backlog_active:0",
+                "repl_backlog_size:1048576",
+                "repl_backlog_first_byte_offset:0",
+                "repl_backlog_histlen:0"
+            ]
+
+            for i, replica in enumerate(connected_slaves):
+                info_lines.append(f"slave{i}:ip={replica["host"]},port={replica["port"]},state=online,offset=0,lag=0")
+
+        info_text = "\r\n".join(info_lines) + "\r\n"
+        return RESPBulkString(info_text)
+
+    else:
+        return RESPBulkString("")
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -569,4 +618,5 @@ COMMANDS = {
     "XADD": cmd_xadd,
     "XRANGE": cmd_xrange,
     "XREAD": cmd_xread,
+    "INFO": cmd_info,
 }

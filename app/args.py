@@ -6,10 +6,12 @@ class Args:
     port: int = 6379
     dir: str | None = None
     dbfilename: str | None = None
+    replicaof: str | None = None
 
 def parse_args() -> Args:
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--port", type=int, required=False)
+    argparser.add_argument("--replicaof", type=str, required=False)
     argparser.add_argument("--dir", type=str, required=False)
     argparser.add_argument("--dbfilename", type=str, required=False)
     namespace = Args()

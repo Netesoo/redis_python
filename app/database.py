@@ -20,6 +20,7 @@ class Database:
         self._store = {}
         self._condition = threading.Condition()
         self._subscriptions = {}
+        self._replicas = []
 
     def set(self, key: str, value: Any, px: int = None):
         with self._condition:
@@ -434,6 +435,21 @@ class Database:
                     return 0
         except ValueError:
             raise ValueError("Invalid stream ID format")
+
+    def get_connected_replicas(self):
+        return self._replicas
+
+    def add_replica(self, host, port, socket):
+        replica = {
+            "host": host,
+            "port": port,
+            "socket": socket,
+            "offest": 0
+        }
+        self._replicas.append(replica)
+
+    def remove_replica(self, socket):
+        self._replicas = [r for r in self._replicas if r["socket"] != socket]
 
 class SortedSet:
     def __init__(self):
