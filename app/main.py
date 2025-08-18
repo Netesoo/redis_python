@@ -1,7 +1,7 @@
 import socket
 import threading
 from app.database import Database
-from app.handler import handle_client
+from app.handler import handle_client, perform_handshake
 from app.args import parse_args
 
 def _gether(database: Database, config: dict):
@@ -15,7 +15,9 @@ def main():
     database = Database()
 
     if config.replicaof:
-        print(f"Starting as replica of {config.replicaof}")
+        host, port = config.replicaof.split(" ")
+        print(f"Starting as replica of {host}:{port}")
+        threading.Thread(target=perform_handshake, args=(host, int(port), config)).start()
     else:
         print("Starting as master")
     

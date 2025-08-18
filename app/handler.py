@@ -1,6 +1,6 @@
+import socket
 from app.commands import handle_command
-from app.resp import RESPType, RESPValue, parse_resp_with_offset, error
-
+from app.resp import RESPType, RESPValue, parse_resp_with_offset, error, RESPArray, RESPBulkString
 
 def handle_parsed_value(resp_value: RESPValue, database, context):
     if resp_value.type != RESPType.ARRAY:
@@ -53,3 +53,16 @@ def handle_client(client, database, config=None):
         for channel in context["subscribed_channels"]:
             database.unsubscribe(channel, client)
     client.close()
+
+def perform_handshake(master_host, master_port, config):
+    try:
+        master_socket = socket.create_connection((master_host, master_port))
+
+        ping_command = RESPArray([RESPBulkString("PING")])
+        master_socket.sendall(ping_command.encode())
+        
+        response = master_socket.recv(1024)
+        print(f"Master response to PING: {response}")
+
+    except Exception as e:
+        print(f"Handshake error: {e}")
