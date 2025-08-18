@@ -611,7 +611,7 @@ def cmd_psync(args, database, context):
     replication_id = args[0]
     offset = args[1]
 
-    if replication_id == "?" and offest == "-1":
+    if replication_id == "?" and offset == "-1":
         master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
         master_offset = 0
 
