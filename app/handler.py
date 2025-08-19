@@ -14,10 +14,16 @@ def handle_parsed_value(resp_value: RESPValue, database, context):
     command = items[0].value.upper()
     args = [item.value for item in items[1:]]
     #return handle_command(command, args, database, context)
-
+    
+    response = handle_command(command, args, database, context)
+    
     if command == "QUIT":
-        return handle_command(command, args, database, context), True
-    return handle_command(command, args, database, context), False
+        return response, True
+
+    if response is None:
+        return b"", False
+
+    return response, False
 
 def handle_client(client, database, config=None):
     buffer = b""
@@ -105,7 +111,8 @@ def perform_handshake(master_host, master_port, config, database):
 def listen_to_master(master_socket, config, database):
     buffer = b""
     rdb_received = False
-    
+    replica_offset = 0
+
     while True:
         try:
             data = master_socket.recv(1024)
@@ -128,7 +135,12 @@ def listen_to_master(master_socket, config, database):
             
             while offset < len(buffer):
                 try:
+                    command_start_offset = offset
                     value, new_offset = parse_resp_with_offset(buffer, offset)
+
+                    command_bytes = buffer[command_start_offset:new_offset]
+                    command_length = len(command_bytes)
+
                     offset = new_offset
                     
                     if value.type == RESPType.ARRAY and value.value:
@@ -137,10 +149,37 @@ def listen_to_master(master_socket, config, database):
                         
                         print(f"Replica received command: {command} {args}")
                         
-                        context = {"config": config, "is_replica": True}
+                        if not (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
+                            replica_offset += command_length
+                        else:
+                            print(f"REPLCONF GETACK - not updating offset")
+
+                        context = {
+                            "config": config, 
+                            "is_replica": True,
+                            "replication_offset": replica_offset
+                            }
+
                         response = handle_command(command, args, database, context)
-                        print(f"Replica executed: {command}")
+
+                        if (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
+                            if response:
+                                # Sprawdź czy response to już bytes czy trzeba je zakodować
+                                if isinstance(response, bytes):
+                                    response_bytes = response
+                                elif hasattr(response, 'encode'):
+                                    response_bytes = response.encode()
+                                else:
+                                    print(f"Invalid response type for GETACK: {type(response)}")
+                                    continue
+                                
+                                master_socket.sendall(response_bytes)
+                                print(f"Replica sent ACK response to master: {response_bytes}")
+                            else:
+                                print(f"No response for GETACK")
                         
+                        print(f"Replica executed: {command}, current offset: {replica_offset}")
+                       
                 except Exception as e:
                     print(f"Error parsing replica command: {e}")
                     break

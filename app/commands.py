@@ -29,7 +29,9 @@ def handle_command(command, args, database, context):
     config = context.get("config", {})
     is_replica = context.get("is_replica", False)
     
-    
+    if command.upper() == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK":
+        return response.encode() if hasattr(response, 'encode') else respons
+
     if not config.replicaof and not is_replica and command.upper() in WRITE_COMMANDS:
         print(f"[REPLICATION] This is master, replicating {command}")
         replicate_command(command, args, database)
@@ -49,6 +51,8 @@ def replicate_command(command, args, database):
     command_bytes = resp_array.encode()
     
     print(f"[REPLICATION] Command bytes to send: {command_bytes}")
+
+    database.increment_replication_offset(len(command_bytes))
     
     for replica in replicas[:]:  
         try:
@@ -635,6 +639,32 @@ def cmd_replconf(args, database, context):
             return ok()
         else:
             return error(f"unsupported capability: {capability}")
+    elif subcommand == "GETACK":
+        if args[1] != "*":
+            return error("wrong number of arguments")
+
+        replica_offset = context.get("replication_offset", 0)
+        print("Tutej++++++")
+        print(replica_offset)
+        return RESPArray([
+            RESPBulkString("REPLCONF"),
+            RESPBulkString("ACK"),
+            RESPBulkString(str(replica_offset))
+        ])
+
+    elif subcommand == "ACK":
+        if len(args) != 2:
+            return error("wrong number of arguments")
+        
+        try:
+            offset = int(args[1])
+            print(f"[REPLICATION] Received ACK from replica with offset: {offset}")
+            
+            context["replica_offset"] = offset
+            return None
+        except ValueError:
+            return error("invalid offset value")
+            
     else:
         return error(f"unknown REPLCONF subcommand: {subcommand}")
 

@@ -21,6 +21,8 @@ class Database:
         self._condition = threading.Condition()
         self._subscriptions = {}
         self._replicas = []
+        self._replication_offset = 0
+        self._replica_offset = 0
 
     def set(self, key: str, value: Any, px: int = None):
         with self._condition:
@@ -450,6 +452,19 @@ class Database:
 
     def remove_replica(self, socket):
         self._replicas = [r for r in self._replicas if r["socket"] != socket]
+
+    def get_replication_offset(self):
+        return self._replication_offset
+    
+    def increment_replication_offset(self, bytes_count):
+        self._replication_offset += bytes_count
+    
+    def get_replica_offset(self):
+        return self._replica_offset
+    
+    def set_replica_offset(self, offset):
+        self._replica_offset = offset
+
 
 class SortedSet:
     def __init__(self):
