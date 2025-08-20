@@ -38,7 +38,7 @@ def handle_client(client, database, config=None):
         "client_addr": client_addr
     }
 
-    while data := client.recv(1024):
+    while data := client.recv(4096):
         buffer += data
         offset = 0
 
@@ -100,7 +100,6 @@ def perform_handshake(master_host, master_port, config, database):
         ])
         master_socket.sendall(psync_command.encode())
         
-        response = master_socket.recv(1024)
         print(f"Master response to PSYNC: {response}")
 
         listen_to_master(master_socket, config, database)
@@ -119,71 +118,62 @@ def listen_to_master(master_socket, config, database):
             if not data:
                 print("Master connection closed")
                 break
-                
+            
             buffer += data
             offset = 0
             
             if not rdb_received:
-                offset = skip_rdb_dump(buffer)
-                if offset == -1:
+                if len(buffer) > 0 and buffer[0:1] == b'+':
+                    value, new_offset = parse_resp_with_offset(buffer, offset)
+                    if value.type != RESPType.SIMPLE_STRING or not value.value.startswith("FULLRESYNC"):
+                        raise ValueError("Expected FULLRESYNC response")
+                    print(f"Received FULLRESYNC: {value.value}")
+                    offset = new_offset
+                
+                rdb_offset = skip_rdb_dump(buffer[offset:])
+                if rdb_offset == -1:
                     continue
                 else:
                     print("RDB dump received and skipped")
+                    offset += rdb_offset
                     rdb_received = True
-                    buffer = buffer[offset:]
-                    offset = 0
             
             while offset < len(buffer):
-                try:
-                    command_start_offset = offset
-                    value, new_offset = parse_resp_with_offset(buffer, offset)
-
-                    command_bytes = buffer[command_start_offset:new_offset]
-                    command_length = len(command_bytes)
-
-                    offset = new_offset
+                command_start_offset = offset
+                value, new_offset = parse_resp_with_offset(buffer, offset)
+                
+                command_bytes = buffer[command_start_offset:new_offset]
+                command_length = len(command_bytes)
+                
+                offset = new_offset
+                
+                if value.type == RESPType.ARRAY and value.value:
+                    command = value.value[0].value.upper()
+                    args = [item.value for item in value.value[1:]]
                     
-                    if value.type == RESPType.ARRAY and value.value:
-                        command = value.value[0].value.upper()
-                        args = [item.value for item in value.value[1:]]
-                        
-                        print(f"Replica received command: {command} {args}")
-                        
-                        if not (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
-                            replica_offset += command_length
+                    print(f"Replica received command: {command} {args}")
+                    
+                    if not (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
+                        replica_offset += command_length
+                    
+                    context = {
+                        "config": config, 
+                        "is_replica": True,
+                        "replication_offset": replica_offset
+                    }
+                    
+                    response = handle_command(command, args, database, context)
+                    
+                    if command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK":
+                        if response:
+                            response_bytes = response.encode() if hasattr(response, 'encode') else response
+                            master_socket.sendall(response_bytes)
+                            print(f"Replica sent ACK response to master: {response_bytes}")
                         else:
-                            print(f"REPLCONF GETACK - not updating offset")
-
-                        context = {
-                            "config": config, 
-                            "is_replica": True,
-                            "replication_offset": replica_offset
-                            }
-
-                        response = handle_command(command, args, database, context)
-
-                        if (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
-                            if response:
-                                # Sprawdź czy response to już bytes czy trzeba je zakodować
-                                if isinstance(response, bytes):
-                                    response_bytes = response
-                                elif hasattr(response, 'encode'):
-                                    response_bytes = response.encode()
-                                else:
-                                    print(f"Invalid response type for GETACK: {type(response)}")
-                                    continue
-                                
-                                master_socket.sendall(response_bytes)
-                                print(f"Replica sent ACK response to master: {response_bytes}")
-                            else:
-                                print(f"No response for GETACK")
-                        
-                        print(f"Replica executed: {command}, current offset: {replica_offset}")
-                       
-                except Exception as e:
-                    print(f"Error parsing replica command: {e}")
-                    break
-            
+                            print(f"No response for GETACK")
+                    
+                    print(f"Replica executed: {command}, current offset: {replica_offset}")
+               
             buffer = buffer[offset:]
             
         except Exception as e:
