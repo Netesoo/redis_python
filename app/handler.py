@@ -139,41 +139,45 @@ def listen_to_master(master_socket, config, database):
                     rdb_received = True
             
             while offset < len(buffer):
-                command_start_offset = offset
-                value, new_offset = parse_resp_with_offset(buffer, offset)
-                
-                command_bytes = buffer[command_start_offset:new_offset]
-                command_length = len(command_bytes)
-                
-                offset = new_offset
-                
-                if value.type == RESPType.ARRAY and value.value:
-                    command = value.value[0].value.upper()
-                    args = [item.value for item in value.value[1:]]
-                    
-                    print(f"Replica received command: {command} {args}")
-                    
-                    if not (command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK"):
+                try:
+                    command_start_offset = offset
+                    value, new_offset = parse_resp_with_offset(buffer, offset)
+
+                    command_bytes = buffer[command_start_offset:new_offset]
+                    command_length = len(command_bytes)
+
+                    offset = new_offset
+
+                    if value.type == RESPType.ARRAY and value.value:
+                        command = value.value[0].value.upper()
+                        args = [item.value for item in value.value[1:]]
+
+                        print(f"Replica received command: {command} {args}")
+
+                        context = {
+                            "config": config, 
+                            "is_replica": True,
+                            "replication_offset": replica_offset
+                        }
+
+                        response = handle_command(command, args, database, context)
+
+                        if command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK":
+                            if response:
+                                response_bytes = response.encode() if hasattr(response, 'encode') else response
+                                master_socket.sendall(response_bytes)
+                                print(f"Replica sent ACK response to master: {response_bytes}")
+                            else:
+                                print(f"No response for GETACK")
+
                         replica_offset += command_length
-                    
-                    context = {
-                        "config": config, 
-                        "is_replica": True,
-                        "replication_offset": replica_offset
-                    }
-                    
-                    response = handle_command(command, args, database, context)
-                    
-                    if command == "REPLCONF" and len(args) > 0 and args[0].upper() == "GETACK":
-                        if response:
-                            response_bytes = response.encode() if hasattr(response, 'encode') else response
-                            master_socket.sendall(response_bytes)
-                            print(f"Replica sent ACK response to master: {response_bytes}")
-                        else:
-                            print(f"No response for GETACK")
-                    
-                    print(f"Replica executed: {command}, current offset: {replica_offset}")
+
+                        print(f"Replica executed: {command}, current offset: {replica_offset}")
                
+                except Exception as e:
+                    print(f"Error parsing replica command: {e}")
+                    break
+                    
             buffer = buffer[offset:]
             
         except Exception as e:
