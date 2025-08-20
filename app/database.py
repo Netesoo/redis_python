@@ -23,6 +23,7 @@ class Database:
         self._replicas = []
         self._replication_offset = 0
         self._replica_offset = 0
+        self._ack_condition = threading.Condition()
 
     def set(self, key: str, value: Any, px: int = None):
         with self._condition:

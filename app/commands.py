@@ -644,8 +644,7 @@ def cmd_replconf(args, database, context):
             return error("wrong number of arguments")
 
         replica_offset = context.get("replication_offset", 0)
-        print("Tutej++++++")
-        print(replica_offset)
+
         return RESPArray([
             RESPBulkString("REPLCONF"),
             RESPBulkString("ACK"),
@@ -660,13 +659,22 @@ def cmd_replconf(args, database, context):
             offset = int(args[1])
             print(f"[REPLICATION] Received ACK from replica with offset: {offset}")
             
-            context["replica_offset"] = offset
+            client_socket = context.get("client_socket")
+            if client_socket:
+                for replica in database.get_connected_replicas():
+                    if replica["socket"] == client_socket:
+                        replica["offset"] = offset
+                        break
+            
+            with database._ack_condition:
+                database._ack_condition.notify_all()
+            
             return None
         except ValueError:
             return error("invalid offset value")
-            
-    else:
-        return error(f"unknown REPLCONF subcommand: {subcommand}")
+                
+        else:
+            return error(f"unknown REPLCONF subcommand: {subcommand}")
 
 def cmd_psync(args, database, context):
     if len(args) != 2:
@@ -713,6 +721,61 @@ def cmd_psync(args, database, context):
     else:
         return error("unsupported PSYNC parameters")
 
+def cmd_wait(args, database, context):
+    if len(args) != 2:
+        return error("wrong number of arguments")
+
+    try:
+        num_replicas = int(args[0])
+        timeout_ms = int(args[1])
+    except ValueError:
+        return error("value is not an integer or out of range")
+
+    if num_replicas < 0:
+        return error("Number of replicas must be 0 or positive")
+
+    config = context.get("config", {})
+    is_replica = context.get("is_replica", False)
+    if config.replicaof or is_replica:
+        return error("ERR WAIT cannot be used with replica instances")
+
+    replicas = database.get_connected_replicas()
+
+    if num_replicas == 0:
+        return RESPInteger(0)
+
+    getack_array = RESPArray([
+        RESPBulkString("REPLCONF"),
+        RESPBulkString("GETACK"),
+        RESPBulkString("*")
+    ])
+    command_bytes = getack_array.encode()
+
+    current_master_offset = database.get_replication_offset()
+
+    for replica in replicas[:]:
+        try:
+            replica["socket"].sendall(command_bytes)
+        except Exception as e:
+            print(f"[WAIT] Failed to send GETACK to replica {replica['host']}:{replica['port']}: {e}")
+            database.remove_replica(replica["socket"])
+
+    start_time = time.time()
+    timeout_sec = timeout_ms / 1000.0 if timeout_ms > 0 else float('inf')
+
+    with database._ack_condition:
+        while True:
+            count = sum(1 for r in database.get_connected_replicas() if r["offset"] >= current_master_offset)
+
+            if count >= num_replicas:
+                return RESPInteger(count)
+
+            remaining = start_time + timeout_sec - time.time()
+            if remaining <= 0:
+                return RESPInteger(count)
+
+            database._ack_condition.wait(timeout=remaining if timeout_ms > 0 else None)
+
 def _match_pattern(key, pattern):
     return fnmatch.fnmatch(key, pattern)
 
@@ -750,4 +813,5 @@ COMMANDS = {
     "INFO": cmd_info,
     "REPLCONF": cmd_replconf,
     "PSYNC": cmd_psync,
+    "WAIT": cmd_wait,
 }
