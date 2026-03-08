@@ -1,60 +1,40 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/4bfadb86-d4f7-4b15-a6b6-96b1a5f0fa4f)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# Custom Redis Implementation (Python)
+A high-performance, asynchronous-ready Redis server implementation from scratch. This project was built as part of the CodeCrafters "Build Your Own Redis" challenge to explore network protocols, data serialization, and distributed system fundamentals.
 
-This is a starting point for Python solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+## 🚀 Implemented Features
+RESP Protocol Parser: Full implementation of the REdis Serialization Protocol, handling Simple Strings, Errors, Integers, Bulk Strings, and Arrays.
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+Core Commands: Support for PING, ECHO, SET, GET (with TTL/expiry support), and INFO.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+Replication: Master-Slave replication logic, including handshake sequences and command propagation.
 
-# Passing the first stage
+RDB Persistence: Ability to parse RDB files to restore server state on startup.
 
-The entry point for your Redis implementation is in `app/main.py`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+Streams: Support for Redis Streams (XADD, XREAD) including blocking read operations.
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
-```
+## 🛠️ Technical Challenges & Learning
+Protocol Accuracy: Implementing the RESP protocol required strict adherence to the specification to ensure compatibility with standard Redis clients.
 
-That's all!
+Concurrency: Managed multiple client connections using Python's threading and socket modules, ensuring thread-safe data access.
 
-# Stage 2 & beyond
+Regression Analysis: (Tutaj możesz dodać to, o czym rozmawialiśmy) After a period of inactivity, I performed a manual audit of the BLPOP logic to align it with updated test specifications, demonstrating my ability to debug and refactor "legacy" code.
 
-Note: This section is for stages 2 and beyond.
+## ⚙️ How to Run
+While this project is designed to be tested via the CodeCrafters CLI, you can run the server locally:
 
-1. Ensure you have `python (3.13)` installed locally
-1. Run `./your_program.sh` to run your Redis server, which is implemented in
-   `app/main.py`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+Prerequisites: Python 3.13+
 
-# Troubleshooting
+Run the server:
 
-## module `socket` has no attribute `create_server`
+Bash
+./your_program.sh
+Note: The server defaults to port 6379.
 
-When running your server locally, you might see an error like this:
+## 🧪 Testing
+The project was rigorously tested using the CodeCrafters CLI integration suite, covering:
 
-```
-Traceback (most recent call last):
-  File "/.../python3.7/runpy.py", line 193, in _run_module_as_main
-    "__main__", mod_spec)
-  File "/.../python3.7/runpy.py", line 85, in _run_code
-    exec(code, run_globals)
-  File "/app/app/main.py", line 11, in <module>
-    main()
-  File "/app/app/main.py", line 6, in main
-    s = socket.create_server(("localhost", 6379), reuse_port=True)
-AttributeError: module 'socket' has no attribute 'create_server'
-```
+Protocol compliance.
 
-This is because `socket.create_server` was introduced in Python 3.8, and you
-might be running an older version.
+Replication consistency.
 
-You can fix this by installing Python 3.8 locally and using that.
-
-If you'd like to use a different version of Python, change the `language_pack`
-value in `codecrafters.yml`.
+Multi-client concurrency.
