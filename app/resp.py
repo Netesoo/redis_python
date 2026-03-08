@@ -64,6 +64,10 @@ class RESPArray:
         
         return response.encode()
 
+class RESPNullArray:
+    def encode(self) -> bytes:
+        return b"*-1\r\n"
+
 def ok() -> RESPSimpleString:
     return RESPSimpleString("OK")
 

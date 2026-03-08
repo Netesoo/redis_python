@@ -2,7 +2,7 @@ import fnmatch
 import time 
 
 from app.resp import (
-    RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray,
+    RESPSimpleString, RESPError, RESPInteger, RESPBulkString, RESPArray, RESPNullArray,
     ok, pong, error, wrongtype_error, null_bulk_string
 )
 from app.database import Stream
@@ -201,7 +201,7 @@ def cmd_blpop(args, database, context):
         return wrongtype_error()
 
     if not result:
-        return null_bulk_string()
+        return RESPNullArray() 
 
     return RESPArray([result[0], result[1]])
 
@@ -542,7 +542,7 @@ def cmd_xread(args, database, context):
         result = database.xread(streams_and_ids, block)
         
         if not result:
-            return null_bulk_string()
+            return RESPNullArray()
         
         response_streams = []
         for stream_key, entries in result:
@@ -562,7 +562,7 @@ def cmd_xread(args, database, context):
                 ]))
         
         if not response_streams:
-            return null_bulk_string()
+            return RESPNullArray()
             
         return RESPArray(response_streams)
         
